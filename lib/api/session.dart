@@ -39,8 +39,14 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> connexion(String identifiant, String motDePasse) async {
-    api.jeton = await api.connexion(identifiant, motDePasse);
-    await _stockage.write(key: _cleJeton, value: api.jeton);
+    await connecterAvecJeton(await api.connexion(identifiant, motDePasse));
+  }
+
+  /// Finalise la session à partir d'un jeton déjà obtenu (utilisé par le sondage
+  /// de vérification, qui teste la connexion sans encore entrer dans l'app).
+  Future<void> connecterAvecJeton(String jeton) async {
+    api.jeton = jeton;
+    await _stockage.write(key: _cleJeton, value: jeton);
     utilisateur = await _profil();
     notifyListeners();
   }

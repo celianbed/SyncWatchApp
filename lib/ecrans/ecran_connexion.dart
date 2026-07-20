@@ -27,6 +27,9 @@ class _EcranConnexionState extends State<EcranConnexion> {
   bool _masquerMdp = true;
   // Non null → on affiche le panneau « vérifie ton adresse mail » (valeur = mail deviné).
   String? _mailAverifier;
+  // identifiant + mot de passe conservés pour le sondage (connexion auto une fois vérifié)
+  String _identifiantAverifier = '';
+  String _mdpAverifier = '';
 
   @override
   void dispose() {
@@ -45,18 +48,18 @@ class _EcranConnexionState extends State<EcranConnexion> {
         await session.inscription(
             _mail.text.trim(), _pseudo.text.trim(), _motDePasse.text);
         // compte créé : il faut confirmer l'adresse avant de pouvoir se connecter
-        if (mounted) setState(() => _mailAverifier = _mail.text.trim());
+        if (mounted) _ouvrirPanneauVerification(_mail.text.trim(), _mail.text.trim());
       } else {
         await session.connexion(_mail.text.trim(), _motDePasse.text);
         // succès : main.dart bascule vers la coquille via le Consumer<Session>
       }
     } on ExceptionApi catch (e) {
-      // 403 « Adresse mail non vérifiée » → on propose de renvoyer le lien
+      // 403 « Adresse mail non vérifiée » → on bascule sur l'attente de vérification
       if (!_inscription && e.code == 403 && e.message.contains('vérifi')) {
         final identifiant = _mail.text.trim();
         if (mounted) {
-          setState(() =>
-              _mailAverifier = identifiant.contains('@') ? identifiant : '');
+          _ouvrirPanneauVerification(
+              identifiant, identifiant.contains('@') ? identifiant : '');
         }
       } else if (mounted) {
         ScaffoldMessenger.of(context)
@@ -76,6 +79,16 @@ class _EcranConnexionState extends State<EcranConnexion> {
     if (_inscription != inscription) {
       setState(() => _inscription = inscription);
     }
+  }
+
+  /// Affiche le panneau d'attente de vérification en mémorisant de quoi sonder
+  /// la connexion (identifiant + mot de passe) et pré-remplir le renvoi de mail.
+  void _ouvrirPanneauVerification(String identifiant, String mailPourRenvoi) {
+    setState(() {
+      _identifiantAverifier = identifiant;
+      _mdpAverifier = _motDePasse.text;
+      _mailAverifier = mailPourRenvoi;
+    });
   }
 
   /// Retour au formulaire depuis le panneau de vérification, mail pré-rempli.
@@ -107,6 +120,8 @@ class _EcranConnexionState extends State<EcranConnexion> {
                 child: _mailAverifier != null
                     ? _PanneauVerification(
                         mailInitial: _mailAverifier!,
+                        identifiant: _identifiantAverifier,
+                        motDePasse: _mdpAverifier,
                         surRetour: _revenirConnexion)
                     : Form(
                   key: _formulaire,
@@ -304,14 +319,21 @@ class _Onglet extends StatelessWidget {
   }
 }
 
-/// Écran intermédiaire après inscription (ou login d'un compte non vérifié) :
-/// invite à confirmer l'adresse mail et permet de renvoyer le lien.
+/// Écran intermédiaire après inscription (ou login d'un compte non vérifié).
+/// Attend la confirmation d'adresse en « temps réel » : sonde la connexion en
+/// arrière-plan et, dès que le compte est vérifié, connecte automatiquement.
 class _PanneauVerification extends StatefulWidget {
   final String mailInitial;
+  final String identifiant; // mail ou pseudo, pour sonder la connexion
+  final String motDePasse;
   final void Function(String mail) surRetour;
 
-  const _PanneauVerification(
-      {required this.mailInitial, required this.surRetour});
+  const _PanneauVerification({
+    required this.mailInitial,
+    required this.identifiant,
+    required this.motDePasse,
+    required this.surRetour,
+  });
 
   @override
   State<_PanneauVerification> createState() => _PanneauVerificationState();
@@ -321,19 +343,60 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
   late final _mail = TextEditingController(text: widget.mailInitial);
   bool _envoi = false;
   int _cooldown = 0; // secondes avant de pouvoir renvoyer
-  Timer? _minuteur;
+  Timer? _minuteurCooldown;
+
+  bool _verifie = false; // vérification détectée → on affiche le ✅ puis on connecte
+  bool _sondageEnCours = false;
+  Timer? _minuteurSondage;
+
+  @override
+  void initState() {
+    super.initState();
+    // sonde tout de suite puis toutes les 3 s, tant que non vérifié
+    _sonder();
+    _minuteurSondage =
+        Timer.periodic(const Duration(seconds: 3), (_) => _sonder());
+  }
 
   @override
   void dispose() {
-    _minuteur?.cancel();
+    _minuteurCooldown?.cancel();
+    _minuteurSondage?.cancel();
     _mail.dispose();
     super.dispose();
   }
 
+  /// Tente la connexion : 403 tant que non vérifié, succès une fois le lien cliqué.
+  Future<void> _sonder() async {
+    if (_sondageEnCours || _verifie || widget.identifiant.isEmpty) return;
+    _sondageEnCours = true;
+    try {
+      final jeton = await api.connexion(widget.identifiant, widget.motDePasse);
+      // compte vérifié : on affiche le ✅ un court instant, puis on entre dans l'app
+      _minuteurSondage?.cancel();
+      if (!mounted) return;
+      setState(() => _verifie = true);
+      await Future.delayed(const Duration(milliseconds: 1100));
+      if (!mounted) return;
+      await context.read<Session>().connecterAvecJeton(jeton);
+      // main.dart bascule vers la Coquille via le Consumer<Session>
+    } on ExceptionApi catch (e) {
+      // 403 = pas encore vérifié → on réessaiera au prochain tick
+      if (e.code != 403 && mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      // erreur réseau ponctuelle : on ignore, le prochain tick retentera
+    } finally {
+      _sondageEnCours = false;
+    }
+  }
+
   void _demarrerCooldown() {
     setState(() => _cooldown = 30);
-    _minuteur?.cancel();
-    _minuteur = Timer.periodic(const Duration(seconds: 1), (t) {
+    _minuteurCooldown?.cancel();
+    _minuteurCooldown = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       setState(() => _cooldown--);
       if (_cooldown <= 0) t.cancel();
@@ -369,6 +432,25 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
   @override
   Widget build(BuildContext context) {
     final typo = Theme.of(context).textTheme;
+
+    // État final : vérifié → ✅ + connexion automatique en cours
+    if (_verifie) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _PastilleLogo(icone: Icons.check_rounded),
+          const SizedBox(height: 20),
+          Text('Compte vérifié',
+              style: typo.headlineMedium, textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text('Connexion en cours…',
+              style: typo.bodySmall, textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          const Center(child: CircularProgressIndicator()),
+        ],
+      );
+    }
+
     final enAttente = _cooldown > 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -379,11 +461,24 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
             style: typo.headlineMedium, textAlign: TextAlign.center),
         const SizedBox(height: 8),
         Text(
-            'On t’a envoyé un lien de confirmation. Ouvre-le pour activer ton '
-            'compte, puis reviens te connecter.',
+            'On t’a envoyé un lien de confirmation. Ouvre-le : l’app te '
+            'connectera automatiquement.',
             style: typo.bodySmall,
             textAlign: TextAlign.center),
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
+        // indicateur « temps réel » : on attend la confirmation
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 10),
+            Text('En attente de confirmation…', style: typo.bodySmall),
+          ],
+        ),
+        const SizedBox(height: 20),
         TextField(
           controller: _mail,
           keyboardType: TextInputType.emailAddress,
