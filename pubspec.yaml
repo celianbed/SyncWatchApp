@@ -1,0 +1,33 @@
+name: syncwatch_mobile
+description: "Application mobile SyncWatch — suivi de séries et de films."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  # État partagé (session, données d'écran)
+  provider: ^6.1.2
+  # Appels HTTP vers l'API SyncWatch
+  http: ^1.2.2
+  # Stockage du jeton JWT dans le trousseau iOS
+  flutter_secure_storage: ^9.2.2
+  # Polices de la charte : titres Sora, UI Inter
+  google_fonts: ^6.2.1
+  # Affiches TMDB avec cache disque
+  cached_network_image: ^3.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

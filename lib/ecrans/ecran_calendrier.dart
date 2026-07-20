@@ -1,0 +1,219 @@
+// Calendrier — diffusions à venir des séries suivies, groupées par jour.
+// Alimenté par GET /calendrier (fenêtre de 30 jours).
+import 'package:flutter/material.dart';
+
+import '../api/client_api.dart';
+import '../modeles/modeles.dart';
+import '../theme.dart';
+import '../util/format.dart';
+import '../widgets/affiche_tmdb.dart';
+import 'ecran_fiche_serie.dart';
+
+class EcranCalendrier extends StatefulWidget {
+  const EcranCalendrier({super.key});
+
+  @override
+  State<EcranCalendrier> createState() => _EcranCalendrierState();
+}
+
+class _EcranCalendrierState extends State<EcranCalendrier> {
+  late Future<List<CalendrierEntree>> _entrees;
+
+  @override
+  void initState() {
+    super.initState();
+    _entrees = _charger();
+  }
+
+  Future<List<CalendrierEntree>> _charger() async {
+    final donnees =
+        await api.get('/calendrier', params: {'jours': '30'}) as List;
+    return [
+      for (final e in donnees)
+        CalendrierEntree.depuisJson(e as Map<String, dynamic>)
+    ];
+  }
+
+  Future<void> _rafraichir() async {
+    setState(() => _entrees = _charger());
+    await _entrees;
+  }
+
+  /// Groupe les entrées (déjà triées par l'API) par jour de diffusion.
+  List<(DateTime, List<CalendrierEntree>)> _parJour(
+      List<CalendrierEntree> entrees) {
+    final groupes = <(DateTime, List<CalendrierEntree>)>[];
+    for (final entree in entrees) {
+      final jour = entree.episode.dateDiffusion;
+      if (jour == null) continue;
+      if (groupes.isEmpty || groupes.last.$1 != jour) {
+        groupes.add((jour, []));
+      }
+      groupes.last.$2.add(entree);
+    }
+    return groupes;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: _rafraichir,
+        child: FutureBuilder(
+          future: _entrees,
+          builder: (context, instantane) {
+            if (instantane.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (instantane.hasError) {
+              // ListView : reste compatible avec le tirer-pour-rafraîchir
+              return ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  _MessageVide(
+                      icone: Icons.cloud_off,
+                      texte: 'API injoignable.\n${instantane.error}'),
+                ],
+              );
+            }
+            final groupes = _parJour(instantane.data ?? []);
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              children: [
+                Text('Calendrier', style: typo.headlineMedium),
+                const SizedBox(height: 4),
+                Text('Les diffusions à venir sur 30 jours',
+                    style: typo.bodySmall),
+                const SizedBox(height: 16),
+                if (groupes.isEmpty)
+                  const _MessageVide(
+                      icone: Icons.event_available_outlined,
+                      texte:
+                          'Aucune diffusion prévue ce mois-ci.\nSeules les séries que tu suis apparaissent ici.')
+                else
+                  for (final (jour, entrees) in groupes) ...[
+                    _EnteteJour(jour: jour),
+                    const SizedBox(height: 10),
+                    for (final entree in entrees) ...[
+                      _CarteDiffusion(
+                          entree: entree, surOuvrir: () => _ouvrir(entree)),
+                      const SizedBox(height: 10),
+                    ],
+                    const SizedBox(height: 12),
+                  ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _ouvrir(CalendrierEntree entree) {
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+            builder: (_) =>
+                EcranFicheSerie(referenceTmdb: entree.serie.referenceTmdb)))
+        .then((_) => _rafraichir());
+  }
+}
+
+class _EnteteJour extends StatelessWidget {
+  final DateTime jour;
+  const _EnteteJour({required this.jour});
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: CouleursSW.accent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(formatJourLong(jour), style: typo.titleLarge),
+      ],
+    );
+  }
+}
+
+class _CarteDiffusion extends StatelessWidget {
+  final CalendrierEntree entree;
+  final VoidCallback surOuvrir;
+
+  const _CarteDiffusion({required this.entree, required this.surOuvrir});
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    final episode = entree.episode;
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: surOuvrir,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              AfficheTmdb(
+                  chemin: entree.serie.affiche,
+                  largeur: 44,
+                  hauteur: 66,
+                  rayon: 8,
+                  largeurTmdb: 154),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(entree.serie.titre,
+                        style: typo.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text(
+                        episode.titre == null
+                            ? episode.code
+                            : '${episode.code} · ${episode.titre}',
+                        style: typo.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right,
+                  color: CouleursSW.texteSecondaire),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageVide extends StatelessWidget {
+  final IconData icone;
+  final String texte;
+  const _MessageVide({required this.icone, required this.texte});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const SizedBox(height: 80),
+        Icon(icone, size: 48, color: CouleursSW.texteSecondaire),
+        const SizedBox(height: 16),
+        Text(texte,
+            style: Theme.of(context).textTheme.bodySmall,
+            textAlign: TextAlign.center),
+      ],
+    );
+  }
+}
