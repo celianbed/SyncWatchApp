@@ -71,6 +71,12 @@ class ClientApi {
     final donnees = _decoder(reponse) as Map<String, dynamic>;
     return donnees['access_token'] as String;
   }
+
+  /// POST /auth/renvoyer-verification — renvoie le mail de confirmation.
+  /// Réponse volontairement générique côté API (ne révèle pas si le compte existe).
+  Future<void> renvoyerVerification(String adresseMail) async {
+    await post('/auth/renvoyer-verification', corps: {'adresse_mail': adresseMail});
+  }
 }
 
 /// Instance unique partagée par toute l'app.

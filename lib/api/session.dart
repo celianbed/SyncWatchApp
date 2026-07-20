@@ -45,6 +45,8 @@ class Session extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Crée le compte. Ne connecte pas : l'API l'interdit tant que l'adresse mail
+  /// n'est pas confirmée (un lien de vérification vient d'être envoyé).
   Future<void> inscription(
       String adresseMail, String pseudo, String motDePasse) async {
     await api.post('/utilisateurs', corps: {
@@ -52,8 +54,11 @@ class Session extends ChangeNotifier {
       'pseudo': pseudo,
       'mot_de_passe': motDePasse,
     });
-    await connexion(adresseMail, motDePasse);
   }
+
+  /// Renvoie le mail de confirmation d'adresse (compte non encore vérifié).
+  Future<void> renvoyerVerification(String adresseMail) =>
+      api.renvoyerVerification(adresseMail);
 
   /// Met à jour le profil ; `avatar` vide = retirer l'avatar.
   /// Seuls les champs non null sont envoyés (PATCH partiel).
