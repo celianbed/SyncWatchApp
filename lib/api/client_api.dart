@@ -1,5 +1,5 @@
 // Client HTTP vers l'API SyncWatch.
-// L'URL se change au lancement : flutter run --dart-define=SYNCWATCH_API=https://…
+// L'URL se change au lancement : flutter run --dart-define=SYNCWATCH_API=http://127.0.0.1:8000
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -15,7 +15,7 @@ class ExceptionApi implements Exception {
 
 class ClientApi {
   static const urlBase = String.fromEnvironment('SYNCWATCH_API',
-      defaultValue: 'http://127.0.0.1:8000');
+      defaultValue: 'https://syncwatch-b3tv.onrender.com');
 
   String? jeton;
 

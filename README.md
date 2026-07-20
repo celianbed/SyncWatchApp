@@ -14,8 +14,8 @@ charte graphique et maquettes Figma (dark, Sora/Inter).
 ## Lancer en local
 
 ```bash
-flutter run                      # API locale (http://127.0.0.1:8000)
-flutter run --dart-define=SYNCWATCH_API=https://syncwatch-api.onrender.com
+flutter run                      # API en prod (https://syncwatch-b3tv.onrender.com)
+flutter run --dart-define=SYNCWATCH_API=http://127.0.0.1:8000   # API locale
 ```
 
 L'app vise le simulateur iOS ; l'URL de l'API se change au lancement via
