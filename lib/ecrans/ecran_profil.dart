@@ -28,6 +28,7 @@ class _EcranProfilState extends State<EcranProfil> {
   late Future<StatsGlobales> _stats;
   late Future<List<ResultatRecherche>> _favoris;
   late Future<List<ResultatRecherche>> _filmsVus;
+  late Future<int> _nonLues;
 
   @override
   void initState() {
@@ -39,10 +40,17 @@ class _EcranProfilState extends State<EcranProfil> {
     _stats = _chargerStats();
     _favoris = _chargerListe('/utilisateurs/moi/favoris');
     _filmsVus = _chargerListe('/utilisateurs/moi/films-vus');
+    _nonLues = _chargerNonLues();
   }
 
   Future<StatsGlobales> _chargerStats() async =>
       StatsGlobales.depuisJson(await api.get('/stats') as Map<String, dynamic>);
+
+  Future<int> _chargerNonLues() async {
+    final donnees =
+        await api.get('/notifications', params: {'lue': 'false'}) as List;
+    return donnees.length;
+  }
 
   Future<List<ResultatRecherche>> _chargerListe(String chemin) async {
     final donnees = await api.get(chemin) as List;
@@ -123,10 +131,42 @@ class _EcranProfilState extends State<EcranProfil> {
                     leading: const Icon(Icons.notifications_outlined,
                         color: CouleursSW.texteSecondaire, size: 22),
                     title: Text('Notifications', style: typo.bodyMedium),
-                    trailing: const Icon(Icons.chevron_right,
-                        color: CouleursSW.texteSecondaire),
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => const EcranNotifications())),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FutureBuilder<int>(
+                          future: _nonLues,
+                          builder: (context, snap) {
+                            final n = snap.data ?? 0;
+                            if (n == 0) return const SizedBox.shrink();
+                            return Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: CouleursSW.accent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(n > 9 ? '9+' : '$n',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700)),
+                            );
+                          },
+                        ),
+                        const Icon(Icons.chevron_right,
+                            color: CouleursSW.texteSecondaire),
+                      ],
+                    ),
+                    onTap: () async {
+                      await Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const EcranNotifications()));
+                      // au retour, le nombre de non lues a pu changer
+                      if (mounted) {
+                        setState(() => _nonLues = _chargerNonLues());
+                      }
+                    },
                   ),
                   const Divider(height: 1),
                   ListTile(

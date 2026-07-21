@@ -291,6 +291,9 @@ class NotificationPublique {
   bool lue;
   final int? idSerie;
   final int? idFilm;
+  // cible de navigation (fiche à ouvrir au tap), résolue par l'API
+  final int? referenceTmdb;
+  final String? cible; // "serie" | "film"
 
   NotificationPublique.depuisJson(Map<String, dynamic> json)
       : idNotification = json['id_notification'] as int,
@@ -299,7 +302,9 @@ class NotificationPublique {
         dateEnvoi = DateTime.parse(json['date_envoi'] as String),
         lue = json['lue'] as bool,
         idSerie = json['id_serie'] as int?,
-        idFilm = json['id_film'] as int?;
+        idFilm = json['id_film'] as int?,
+        referenceTmdb = json['reference_tmdb'] as int?,
+        cible = json['cible'] as String?;
 }
 
 /// Progression estimée d'une série : l'API expose le prochain épisode non vu,

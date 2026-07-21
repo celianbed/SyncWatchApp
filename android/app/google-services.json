@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "342313200348",
+    "project_id": "coffee-spark-ai-barista-af556",
+    "storage_bucket": "coffee-spark-ai-barista-af556.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:342313200348:android:702acbc57a30fa2a3da219",
+        "android_client_info": {
+          "package_name": "com.syncwatch.syncwatch_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVQNWzl2CEv_zAuvJMpiwho57bq0WlhJg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

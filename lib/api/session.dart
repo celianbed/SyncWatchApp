@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../modeles/modeles.dart';
+import '../services/push.dart';
 import 'client_api.dart';
 
 class Session extends ChangeNotifier {
@@ -24,6 +25,7 @@ class Session extends ChangeNotifier {
       if (jeton != null) {
         api.jeton = jeton;
         utilisateur = await _profil();
+        Push.initialiser(); // enregistre l'appareil pour les notifs push (Android)
       }
     } catch (_) {
       api.jeton = null; // jeton périmé ou API injoignable : on repart propre
@@ -48,6 +50,7 @@ class Session extends ChangeNotifier {
     api.jeton = jeton;
     await _stockage.write(key: _cleJeton, value: jeton);
     utilisateur = await _profil();
+    Push.initialiser(); // enregistre l'appareil pour les notifs push (Android)
     notifyListeners();
   }
 

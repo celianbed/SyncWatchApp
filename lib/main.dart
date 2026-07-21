@@ -7,6 +7,7 @@ import 'api/session.dart';
 import 'ecrans/coquille.dart';
 import 'ecrans/ecran_connexion.dart';
 import 'ecrans/ecran_onboarding.dart';
+import 'services/push.dart';
 import 'theme.dart';
 
 void main() {
@@ -23,6 +24,7 @@ class AppSyncWatch extends StatelessWidget {
       child: MaterialApp(
         title: 'SyncWatch',
         debugShowCheckedModeBanner: false,
+        navigatorKey: navigatorKey, // ouverture d'une fiche depuis une notif push
         theme: themeSyncWatch(),
         home: Consumer<Session>(
           builder: (_, session, _) {

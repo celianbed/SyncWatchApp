@@ -6,6 +6,8 @@ import '../api/client_api.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/format.dart';
+import 'ecran_fiche_film.dart';
+import 'ecran_fiche_serie.dart';
 
 class EcranNotifications extends StatefulWidget {
   const EcranNotifications({super.key});
@@ -45,6 +47,17 @@ class _EcranNotificationsState extends State<EcranNotifications> {
     } on ExceptionApi {
       if (mounted) setState(() => notification.lue = false);
     }
+  }
+
+  /// Tap : marque lu et ouvre la fiche liée (série/film) si disponible.
+  void _ouvrir(NotificationPublique notification) {
+    _marquerLue(notification); // en arrière-plan (optimiste)
+    final ref = notification.referenceTmdb;
+    if (ref == null) return;
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => notification.cible == 'film'
+            ? EcranFicheFilm(referenceTmdb: ref)
+            : EcranFicheSerie(referenceTmdb: ref)));
   }
 
   Future<void> _toutMarquerLu() async {
@@ -97,7 +110,7 @@ class _EcranNotificationsState extends State<EcranNotifications> {
                         itemBuilder: (_, i) =>
                             _CarteNotification(
                                 notification: notifications[i],
-                                surTape: () => _marquerLue(notifications[i])),
+                                surTape: () => _ouvrir(notifications[i])),
                       ),
                     ),
     );
