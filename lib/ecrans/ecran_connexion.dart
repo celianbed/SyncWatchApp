@@ -91,6 +91,16 @@ class _EcranConnexionState extends State<EcranConnexion> {
     });
   }
 
+  /// Ouvre la feuille « mot de passe oublié » (reset via lien web).
+  void _motDePasseOublie() {
+    final prerempli = _mail.text.contains('@') ? _mail.text.trim() : '';
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _FeuilleMotDePasseOublie(mailInitial: prerempli),
+    );
+  }
+
   /// Retour au formulaire depuis le panneau de vérification, mail pré-rempli.
   void _revenirConnexion(String mail) {
     if (mail.isNotEmpty) _mail.text = mail;
@@ -226,7 +236,22 @@ class _EcranConnexionState extends State<EcranConnexion> {
                                     : null,
                         onFieldSubmitted: (_) => _valider(),
                       ),
-                      const SizedBox(height: 24),
+                      if (!_inscription)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _motDePasseOublie,
+                            style: TextButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Mot de passe oublié ?'),
+                          ),
+                        ),
+                      SizedBox(height: _inscription ? 24 : 12),
                       ElevatedButton(
                         onPressed: _chargement ? null : _valider,
                         child: _chargement
@@ -244,6 +269,101 @@ class _EcranConnexionState extends State<EcranConnexion> {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Feuille de saisie de l'adresse mail pour recevoir un lien de réinitialisation.
+class _FeuilleMotDePasseOublie extends StatefulWidget {
+  final String mailInitial;
+  const _FeuilleMotDePasseOublie({required this.mailInitial});
+
+  @override
+  State<_FeuilleMotDePasseOublie> createState() =>
+      _FeuilleMotDePasseOublieState();
+}
+
+class _FeuilleMotDePasseOublieState extends State<_FeuilleMotDePasseOublie> {
+  late final _mail = TextEditingController(text: widget.mailInitial);
+  bool _envoi = false;
+
+  @override
+  void dispose() {
+    _mail.dispose();
+    super.dispose();
+  }
+
+  Future<void> _envoyer() async {
+    final mail = _mail.text.trim();
+    if (!mail.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Renseigne une adresse mail valide.')));
+      return;
+    }
+    setState(() => _envoi = true);
+    try {
+      await context.read<Session>().motDePasseOublie(mail);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Si un compte existe, un lien de réinitialisation vient de partir.')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _envoi = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: 24 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Mot de passe oublié', style: typo.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+              'Entre ton adresse mail : on t’envoie un lien pour choisir un '
+              'nouveau mot de passe.',
+              style: typo.bodySmall),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _mail,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Adresse mail',
+              prefixIcon: Icon(Icons.alternate_email,
+                  color: CouleursSW.texteSecondaire, size: 20),
+            ),
+            onSubmitted: (_) => _envoyer(),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _envoi ? null : _envoyer,
+            child: _envoi
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Text('Envoyer le lien'),
           ),
         ],
       ),

@@ -77,6 +77,12 @@ class ClientApi {
   Future<void> renvoyerVerification(String adresseMail) async {
     await post('/auth/renvoyer-verification', corps: {'adresse_mail': adresseMail});
   }
+
+  /// POST /auth/mot-de-passe-oublie — envoie un lien de réinitialisation.
+  /// Réponse générique côté API (ne révèle pas si le compte existe).
+  Future<void> motDePasseOublie(String adresseMail) async {
+    await post('/auth/mot-de-passe-oublie', corps: {'adresse_mail': adresseMail});
+  }
 }
 
 /// Instance unique partagée par toute l'app.

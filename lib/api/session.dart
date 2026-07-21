@@ -66,6 +66,10 @@ class Session extends ChangeNotifier {
   Future<void> renvoyerVerification(String adresseMail) =>
       api.renvoyerVerification(adresseMail);
 
+  /// Demande un lien de réinitialisation de mot de passe (reset via page web).
+  Future<void> motDePasseOublie(String adresseMail) =>
+      api.motDePasseOublie(adresseMail);
+
   /// Met à jour le profil ; `avatar` vide = retirer l'avatar.
   /// Seuls les champs non null sont envoyés (PATCH partiel).
   Future<void> mettreAJourProfil({String? pseudo, String? avatar}) async {
