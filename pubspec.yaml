@@ -31,6 +31,28 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  # Génération de l'icône d'app et du splash à partir de assets/logo.png
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.3
+
+# Icône d'app (iOS + Android) — fond #1E293B identique au logo (pas de transparence iOS)
+flutter_launcher_icons:
+  image_path: "assets/logo_icon.png"          # version zoomée (iOS + Android legacy)
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: "#1E293B"
+  adaptive_icon_background: "#1E293B"
+  adaptive_icon_foreground: "assets/logo.png" # original (l'adaptive Android zoome déjà)
+  min_sdk_android: 21
+
+# Écran de démarrage — fond #1E293B (couleur du logo) → le logo se fond dedans
+flutter_native_splash:
+  color: "#1E293B"
+  image: assets/logo.png
+  android_12:
+    color: "#1E293B"
+    image: assets/logo.png
 
 flutter:
   uses-material-design: true
