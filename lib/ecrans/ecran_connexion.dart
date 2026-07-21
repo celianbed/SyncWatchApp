@@ -46,9 +46,14 @@ class _EcranConnexionState extends State<EcranConnexion> {
     try {
       if (_inscription) {
         await session.inscription(
-            _mail.text.trim(), _pseudo.text.trim(), _motDePasse.text);
+          _mail.text.trim(),
+          _pseudo.text.trim(),
+          _motDePasse.text,
+        );
         // compte créé : il faut confirmer l'adresse avant de pouvoir se connecter
-        if (mounted) _ouvrirPanneauVerification(_mail.text.trim(), _mail.text.trim());
+        if (mounted) {
+          _ouvrirPanneauVerification(_mail.text.trim(), _mail.text.trim());
+        }
       } else {
         await session.connexion(_mail.text.trim(), _motDePasse.text);
         // succès : main.dart bascule vers la coquille via le Consumer<Session>
@@ -59,16 +64,20 @@ class _EcranConnexionState extends State<EcranConnexion> {
         final identifiant = _mail.text.trim();
         if (mounted) {
           _ouvrirPanneauVerification(
-              identifiant, identifiant.contains('@') ? identifiant : '');
+            identifiant,
+            identifiant.contains('@') ? identifiant : '',
+          );
         }
       } else if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) setState(() => _chargement = false);
@@ -118,155 +127,197 @@ class _EcranConnexionState extends State<EcranConnexion> {
       body: Stack(
         children: [
           const Halo(
-              couleur: CouleursSW.accent, alignement: Alignment(-1.2, -1.0)),
+            couleur: CouleursSW.accent,
+            alignement: Alignment(-1.2, -1.0),
+          ),
           const Halo(
-              couleur: CouleursSW.accentSecondaire,
-              alignement: Alignment(1.3, 1.1)),
+            couleur: CouleursSW.accentSecondaire,
+            alignement: Alignment(1.3, 1.1),
+          ),
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 32,
+                ),
                 child: _mailAverifier != null
                     ? _PanneauVerification(
                         mailInitial: _mailAverifier!,
                         identifiant: _identifiantAverifier,
                         motDePasse: _mdpAverifier,
-                        surRetour: _revenirConnexion)
+                        surRetour: _revenirConnexion,
+                      )
                     : Form(
-                  key: _formulaire,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const _PastilleLogo(),
-                      const SizedBox(height: 20),
-                      // Logo
-                      Text.rich(
-                        TextSpan(
-                          style: GoogleFonts.sora(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w700,
-                              color: CouleursSW.texte),
-                          children: const [
-                            TextSpan(text: 'Sync'),
-                            TextSpan(
-                                text: 'Watch',
-                                style: TextStyle(color: CouleursSW.accent)),
+                        key: _formulaire,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Wordmark : la typo est le logo (pas de pastille)
+                            Text.rich(
+                              TextSpan(
+                                style: GoogleFonts.sora(
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.5,
+                                  color: CouleursSW.texte,
+                                ),
+                                children: const [
+                                  TextSpan(text: 'Sync'),
+                                  TextSpan(
+                                    text: 'Watch',
+                                    style: TextStyle(color: CouleursSW.accent),
+                                  ),
+                                ],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 14),
+                            // courte barre d'accent sous le wordmark
+                            Center(
+                              child: Container(
+                                width: 34,
+                                height: 3,
+                                decoration: BoxDecoration(
+                                  color: CouleursSW.accent,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'Tes séries et tes films, au même endroit.',
+                              style: typo.bodySmall,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 32),
+                            Row(
+                              children: [
+                                _Onglet(
+                                  libelle: 'Connexion',
+                                  actif: !_inscription,
+                                  surTape: () => _basculer(false),
+                                ),
+                                const SizedBox(width: 8),
+                                _Onglet(
+                                  libelle: 'Inscription',
+                                  actif: _inscription,
+                                  surTape: () => _basculer(true),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            if (_inscription) ...[
+                              TextFormField(
+                                controller: _pseudo,
+                                decoration: const InputDecoration(
+                                  hintText: 'Pseudo',
+                                  prefixIcon: Icon(
+                                    Icons.person_outline,
+                                    color: CouleursSW.texteSecondaire,
+                                    size: 20,
+                                  ),
+                                ),
+                                validator: (v) =>
+                                    (v == null || v.trim().length < 3)
+                                    ? '3 caractères minimum'
+                                    : null,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            TextFormField(
+                              controller: _mail,
+                              keyboardType: TextInputType.emailAddress,
+                              autocorrect: false,
+                              decoration: InputDecoration(
+                                hintText: _inscription
+                                    ? 'Adresse mail'
+                                    : 'Adresse mail ou pseudo',
+                                prefixIcon: const Icon(
+                                  Icons.alternate_email,
+                                  color: CouleursSW.texteSecondaire,
+                                  size: 20,
+                                ),
+                              ),
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Champ requis';
+                                }
+                                if (_inscription && !v.contains('@')) {
+                                  return 'Adresse mail invalide';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _motDePasse,
+                              obscureText: _masquerMdp,
+                              decoration: InputDecoration(
+                                hintText: 'Mot de passe',
+                                prefixIcon: const Icon(
+                                  Icons.lock_outline,
+                                  color: CouleursSW.texteSecondaire,
+                                  size: 20,
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _masquerMdp
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: CouleursSW.texteSecondaire,
+                                    size: 20,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _masquerMdp = !_masquerMdp,
+                                  ),
+                                ),
+                              ),
+                              validator: (v) =>
+                                  (_inscription && (v == null || v.length < 8))
+                                  ? '8 caractères minimum'
+                                  : (v == null || v.isEmpty)
+                                  ? 'Champ requis'
+                                  : null,
+                              onFieldSubmitted: (_) => _valider(),
+                            ),
+                            if (!_inscription)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: _motDePasseOublie,
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Mot de passe oublié ?'),
+                                ),
+                              ),
+                            SizedBox(height: _inscription ? 24 : 12),
+                            ElevatedButton(
+                              onPressed: _chargement ? null : _valider,
+                              child: _chargement
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      _inscription
+                                          ? 'Créer mon compte'
+                                          : 'Se connecter',
+                                    ),
+                            ),
                           ],
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
-                      Text('Tes séries et tes films, au même endroit.',
-                          style: typo.bodySmall, textAlign: TextAlign.center),
-                      const SizedBox(height: 32),
-                      Row(
-                        children: [
-                          _Onglet(
-                              libelle: 'Connexion',
-                              actif: !_inscription,
-                              surTape: () => _basculer(false)),
-                          const SizedBox(width: 8),
-                          _Onglet(
-                              libelle: 'Inscription',
-                              actif: _inscription,
-                              surTape: () => _basculer(true)),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      if (_inscription) ...[
-                        TextFormField(
-                          controller: _pseudo,
-                          decoration: const InputDecoration(
-                            hintText: 'Pseudo',
-                            prefixIcon: Icon(Icons.person_outline,
-                                color: CouleursSW.texteSecondaire, size: 20),
-                          ),
-                          validator: (v) => (v == null || v.trim().length < 3)
-                              ? '3 caractères minimum'
-                              : null,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      TextFormField(
-                        controller: _mail,
-                        keyboardType: TextInputType.emailAddress,
-                        autocorrect: false,
-                        decoration: InputDecoration(
-                          hintText: _inscription
-                              ? 'Adresse mail'
-                              : 'Adresse mail ou pseudo',
-                          prefixIcon: const Icon(Icons.alternate_email,
-                              color: CouleursSW.texteSecondaire, size: 20),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Champ requis';
-                          }
-                          if (_inscription && !v.contains('@')) {
-                            return 'Adresse mail invalide';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _motDePasse,
-                        obscureText: _masquerMdp,
-                        decoration: InputDecoration(
-                          hintText: 'Mot de passe',
-                          prefixIcon: const Icon(Icons.lock_outline,
-                              color: CouleursSW.texteSecondaire, size: 20),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                                _masquerMdp
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                                color: CouleursSW.texteSecondaire,
-                                size: 20),
-                            onPressed: () =>
-                                setState(() => _masquerMdp = !_masquerMdp),
-                          ),
-                        ),
-                        validator: (v) =>
-                            (_inscription && (v == null || v.length < 8))
-                                ? '8 caractères minimum'
-                                : (v == null || v.isEmpty)
-                                    ? 'Champ requis'
-                                    : null,
-                        onFieldSubmitted: (_) => _valider(),
-                      ),
-                      if (!_inscription)
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: _motDePasseOublie,
-                            style: TextButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4),
-                              minimumSize: Size.zero,
-                              tapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text('Mot de passe oublié ?'),
-                          ),
-                        ),
-                      SizedBox(height: _inscription ? 24 : 12),
-                      ElevatedButton(
-                        onPressed: _chargement ? null : _valider,
-                        child: _chargement
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
-                            : Text(_inscription
-                                ? 'Créer mon compte'
-                                : 'Se connecter'),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ),
           ),
@@ -300,7 +351,8 @@ class _FeuilleMotDePasseOublieState extends State<_FeuilleMotDePasseOublie> {
     final mail = _mail.text.trim();
     if (!mail.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Renseigne une adresse mail valide.')));
+        const SnackBar(content: Text('Renseigne une adresse mail valide.')),
+      );
       return;
     }
     setState(() => _envoi = true);
@@ -308,13 +360,18 @@ class _FeuilleMotDePasseOublieState extends State<_FeuilleMotDePasseOublie> {
       await context.read<Session>().motDePasseOublie(mail);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
           content: Text(
-              'Si un compte existe, un lien de réinitialisation vient de partir.')));
+            'Si un compte existe, un lien de réinitialisation vient de partir.',
+          ),
+        ),
+      );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) setState(() => _envoi = false);
@@ -338,9 +395,10 @@ class _FeuilleMotDePasseOublieState extends State<_FeuilleMotDePasseOublie> {
           Text('Mot de passe oublié', style: typo.titleLarge),
           const SizedBox(height: 8),
           Text(
-              'Entre ton adresse mail : on t’envoie un lien pour choisir un '
-              'nouveau mot de passe.',
-              style: typo.bodySmall),
+            'Entre ton adresse mail et on t’envoie un lien pour choisir un '
+            'nouveau mot de passe.',
+            style: typo.bodySmall,
+          ),
           const SizedBox(height: 20),
           TextField(
             controller: _mail,
@@ -349,8 +407,11 @@ class _FeuilleMotDePasseOublieState extends State<_FeuilleMotDePasseOublie> {
             autofocus: true,
             decoration: const InputDecoration(
               hintText: 'Adresse mail',
-              prefixIcon: Icon(Icons.alternate_email,
-                  color: CouleursSW.texteSecondaire, size: 20),
+              prefixIcon: Icon(
+                Icons.alternate_email,
+                color: CouleursSW.texteSecondaire,
+                size: 20,
+              ),
             ),
             onSubmitted: (_) => _envoyer(),
           ),
@@ -362,7 +423,10 @@ class _FeuilleMotDePasseOublieState extends State<_FeuilleMotDePasseOublie> {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                 : const Text('Envoyer le lien'),
           ),
         ],
@@ -371,10 +435,12 @@ class _FeuilleMotDePasseOublieState extends State<_FeuilleMotDePasseOublie> {
   }
 }
 
-/// Pastille « icône d'app » : carré arrondi dégradé accent → cyan.
+/// Pastille plate : rond légèrement teinté + icône de la même couleur.
+/// (Ni dégradé ni glow — cohérent avec le wordmark épuré.)
 class _PastilleLogo extends StatelessWidget {
   final IconData icone;
-  const _PastilleLogo({this.icone = Icons.play_arrow_rounded});
+  final Color couleur;
+  const _PastilleLogo({required this.icone, this.couleur = CouleursSW.accent});
 
   @override
   Widget build(BuildContext context) {
@@ -383,20 +449,10 @@ class _PastilleLogo extends StatelessWidget {
         width: 72,
         height: 72,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [CouleursSW.accent, CouleursSW.accentSecondaire],
-          ),
-          boxShadow: [
-            BoxShadow(
-                color: CouleursSW.accent.withValues(alpha: .35),
-                blurRadius: 24,
-                offset: const Offset(0, 8)),
-          ],
+          color: couleur.withValues(alpha: .14),
+          shape: BoxShape.circle,
         ),
-        child: Icon(icone, size: 44, color: Colors.white),
+        child: Icon(icone, size: 34, color: couleur),
       ),
     );
   }
@@ -407,8 +463,11 @@ class _Onglet extends StatelessWidget {
   final bool actif;
   final VoidCallback surTape;
 
-  const _Onglet(
-      {required this.libelle, required this.actif, required this.surTape});
+  const _Onglet({
+    required this.libelle,
+    required this.actif,
+    required this.surTape,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -424,15 +483,18 @@ class _Onglet extends StatelessWidget {
                 : CouleursSW.surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-                color: actif ? CouleursSW.accent : Colors.transparent),
+              color: actif ? CouleursSW.accent : Colors.transparent,
+            ),
           ),
-          child: Text(libelle,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color:
-                      actif ? CouleursSW.accent : CouleursSW.texteSecondaire)),
+          child: Text(
+            libelle,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: actif ? CouleursSW.accent : CouleursSW.texteSecondaire,
+            ),
+          ),
         ),
       ),
     );
@@ -465,7 +527,8 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
   int _cooldown = 0; // secondes avant de pouvoir renvoyer
   Timer? _minuteurCooldown;
 
-  bool _verifie = false; // vérification détectée → on affiche le ✅ puis on connecte
+  bool _verifie =
+      false; // vérification détectée → on affiche le ✅ puis on connecte
   bool _sondageEnCours = false;
   Timer? _minuteurSondage;
 
@@ -474,8 +537,10 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
     super.initState();
     // sonde tout de suite puis toutes les 3 s, tant que non vérifié
     _sonder();
-    _minuteurSondage =
-        Timer.periodic(const Duration(seconds: 3), (_) => _sonder());
+    _minuteurSondage = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _sonder(),
+    );
   }
 
   @override
@@ -503,8 +568,9 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
     } on ExceptionApi catch (e) {
       // 403 = pas encore vérifié → on réessaiera au prochain tick
       if (e.code != 403 && mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (_) {
       // erreur réseau ponctuelle : on ignore, le prochain tick retentera
@@ -527,22 +593,29 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
     final mail = _mail.text.trim();
     if (!mail.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Renseigne une adresse mail valide.')));
+        const SnackBar(content: Text('Renseigne une adresse mail valide.')),
+      );
       return;
     }
     setState(() => _envoi = true);
     try {
       await context.read<Session>().renvoyerVerification(mail);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Si un compte non vérifié existe, '
-                'un nouveau lien vient de partir.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Si un compte non vérifié existe, '
+              'un nouveau lien vient de partir.',
+            ),
+          ),
+        );
       }
       _demarrerCooldown();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) setState(() => _envoi = false);
@@ -558,13 +631,20 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _PastilleLogo(icone: Icons.check_rounded),
+          const _PastilleLogo(
+              icone: Icons.check_rounded, couleur: CouleursSW.succes),
           const SizedBox(height: 20),
-          Text('Compte vérifié',
-              style: typo.headlineMedium, textAlign: TextAlign.center),
+          Text(
+            'Compte vérifié',
+            style: typo.headlineMedium,
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 8),
-          Text('Connexion en cours…',
-              style: typo.bodySmall, textAlign: TextAlign.center),
+          Text(
+            'Connexion en cours…',
+            style: typo.bodySmall,
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 24),
           const Center(child: CircularProgressIndicator()),
         ],
@@ -577,23 +657,28 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
       children: [
         const _PastilleLogo(icone: Icons.mark_email_read_rounded),
         const SizedBox(height: 20),
-        Text('Vérifie ton adresse mail',
-            style: typo.headlineMedium, textAlign: TextAlign.center),
+        Text(
+          'Vérifie ton adresse mail',
+          style: typo.headlineMedium,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
         Text(
-            'On t’a envoyé un lien de confirmation. Ouvre-le : l’app te '
-            'connectera automatiquement.',
-            style: typo.bodySmall,
-            textAlign: TextAlign.center),
+          'On t’a envoyé un lien de confirmation. Ouvre-le : l’app te '
+          'connectera automatiquement.',
+          style: typo.bodySmall,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 20),
         // indicateur « temps réel » : on attend la confirmation
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2)),
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
             const SizedBox(width: 10),
             Text('En attente de confirmation…', style: typo.bodySmall),
           ],
@@ -605,8 +690,11 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
           autocorrect: false,
           decoration: const InputDecoration(
             hintText: 'Adresse mail',
-            prefixIcon: Icon(Icons.alternate_email,
-                color: CouleursSW.texteSecondaire, size: 20),
+            prefixIcon: Icon(
+              Icons.alternate_email,
+              color: CouleursSW.texteSecondaire,
+              size: 20,
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -617,10 +705,15 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : Text(enAttente
-                  ? 'Renvoyer dans $_cooldown s'
-                  : 'Renvoyer l’email de confirmation'),
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Text(
+                  enAttente
+                      ? 'Renvoyer dans $_cooldown s'
+                      : 'Renvoyer l’email de confirmation',
+                ),
         ),
         const SizedBox(height: 8),
         TextButton(
