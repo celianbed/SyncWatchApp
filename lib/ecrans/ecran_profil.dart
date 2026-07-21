@@ -8,6 +8,8 @@ import '../api/client_api.dart';
 import '../api/session.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
+import '../widgets/rangee_resultats.dart';
+import 'ecran_liste_resultats.dart';
 import 'ecran_notifications.dart';
 
 const _moisPleins = [
@@ -15,8 +17,45 @@ const _moisPleins = [
   'août', 'septembre', 'octobre', 'novembre', 'décembre',
 ];
 
-class EcranProfil extends StatelessWidget {
+class EcranProfil extends StatefulWidget {
   const EcranProfil({super.key});
+
+  @override
+  State<EcranProfil> createState() => _EcranProfilState();
+}
+
+class _EcranProfilState extends State<EcranProfil> {
+  late Future<StatsGlobales> _stats;
+  late Future<List<ResultatRecherche>> _favoris;
+  late Future<List<ResultatRecherche>> _filmsVus;
+
+  @override
+  void initState() {
+    super.initState();
+    _charger();
+  }
+
+  void _charger() {
+    _stats = _chargerStats();
+    _favoris = _chargerListe('/utilisateurs/moi/favoris');
+    _filmsVus = _chargerListe('/utilisateurs/moi/films-vus');
+  }
+
+  Future<StatsGlobales> _chargerStats() async =>
+      StatsGlobales.depuisJson(await api.get('/stats') as Map<String, dynamic>);
+
+  Future<List<ResultatRecherche>> _chargerListe(String chemin) async {
+    final donnees = await api.get(chemin) as List;
+    return [
+      for (final r in donnees)
+        ResultatRecherche.depuisJson(r as Map<String, dynamic>)
+    ];
+  }
+
+  Future<void> _rafraichir() async {
+    setState(_charger);
+    await Future.wait([_stats, _favoris, _filmsVus]);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,64 +64,87 @@ class EcranProfil extends StatelessWidget {
     final typo = Theme.of(context).textTheme;
 
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-        children: [
-          Center(child: _Avatar(utilisateur: utilisateur)),
-          const SizedBox(height: 16),
-          Text(utilisateur?.pseudo ?? '…',
-              style: typo.titleLarge, textAlign: TextAlign.center),
-          const SizedBox(height: 4),
-          Text(utilisateur?.adresseMail ?? '',
-              style: typo.bodySmall, textAlign: TextAlign.center),
-          if (utilisateur != null) ...[
+      child: RefreshIndicator(
+        onRefresh: _rafraichir,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+          children: [
+            Center(child: _Avatar(utilisateur: utilisateur)),
+            const SizedBox(height: 16),
+            Text(utilisateur?.pseudo ?? '…',
+                style: typo.titleLarge, textAlign: TextAlign.center),
             const SizedBox(height: 4),
-            Text(
-              'Membre depuis ${_moisPleins[utilisateur.dateInscription.month - 1]} ${utilisateur.dateInscription.year}',
-              style: typo.bodySmall,
-              textAlign: TextAlign.center,
+            Text(utilisateur?.adresseMail ?? '',
+                style: typo.bodySmall, textAlign: TextAlign.center),
+            if (utilisateur != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Membre depuis ${_moisPleins[utilisateur.dateInscription.month - 1]} ${utilisateur.dateInscription.year}',
+                style: typo.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 28),
+            // Résumé des statistiques
+            FutureBuilder<StatsGlobales>(
+              future: _stats,
+              builder: (context, snap) => snap.hasData
+                  ? _RangeeStats(stats: snap.data!)
+                  : const SizedBox(height: 72),
             ),
+            const SizedBox(height: 28),
+            _TitreSection(titre: 'Favoris'),
+            const SizedBox(height: 12),
+            CarrouselResultats(
+                resultats: _favoris,
+                surOuvrir: (r) => ouvrirFiche(context, r)),
+            const SizedBox(height: 28),
+            _TitreSection(titre: 'Vu récemment'),
+            const SizedBox(height: 12),
+            CarrouselResultats(
+                resultats: _filmsVus,
+                surOuvrir: (r) => ouvrirFiche(context, r)),
+            const SizedBox(height: 28),
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined,
+                        color: CouleursSW.texteSecondaire, size: 22),
+                    title: Text('Modifier le profil', style: typo.bodyMedium),
+                    trailing: const Icon(Icons.chevron_right,
+                        color: CouleursSW.texteSecondaire),
+                    onTap: utilisateur == null
+                        ? null
+                        : () => _modifierProfil(context, utilisateur),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.notifications_outlined,
+                        color: CouleursSW.texteSecondaire, size: 22),
+                    title: Text('Notifications', style: typo.bodyMedium),
+                    trailing: const Icon(Icons.chevron_right,
+                        color: CouleursSW.texteSecondaire),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const EcranNotifications())),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.logout,
+                        color: CouleursSW.danger, size: 22),
+                    title: Text('Se déconnecter',
+                        style: typo.bodyMedium
+                            ?.copyWith(color: CouleursSW.danger)),
+                    onTap: () => _confirmerDeconnexion(context),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text('API : ${ClientApi.urlBase}',
+                style: typo.labelSmall, textAlign: TextAlign.center),
           ],
-          const SizedBox(height: 32),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.edit_outlined,
-                      color: CouleursSW.texteSecondaire, size: 22),
-                  title: Text('Modifier le profil', style: typo.bodyMedium),
-                  trailing: const Icon(Icons.chevron_right,
-                      color: CouleursSW.texteSecondaire),
-                  onTap: utilisateur == null
-                      ? null
-                      : () => _modifierProfil(context, utilisateur),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.notifications_outlined,
-                      color: CouleursSW.texteSecondaire, size: 22),
-                  title: Text('Notifications', style: typo.bodyMedium),
-                  trailing: const Icon(Icons.chevron_right,
-                      color: CouleursSW.texteSecondaire),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const EcranNotifications())),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.logout,
-                      color: CouleursSW.danger, size: 22),
-                  title: Text('Se déconnecter',
-                      style:
-                          typo.bodyMedium?.copyWith(color: CouleursSW.danger)),
-                  onTap: () => _confirmerDeconnexion(context),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          Text('API : ${ClientApi.urlBase}',
-              style: typo.labelSmall, textAlign: TextAlign.center),
-        ],
+        ),
       ),
     );
   }
@@ -115,6 +177,70 @@ class EcranProfil extends StatelessWidget {
                 style: TextStyle(color: CouleursSW.danger)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Titre de section (Favoris, Vu récemment…).
+class _TitreSection extends StatelessWidget {
+  final String titre;
+  const _TitreSection({required this.titre});
+
+  @override
+  Widget build(BuildContext context) =>
+      Text(titre, style: Theme.of(context).textTheme.titleMedium);
+}
+
+/// Résumé compact des statistiques : 4 tuiles.
+class _RangeeStats extends StatelessWidget {
+  final StatsGlobales stats;
+  const _RangeeStats({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <(String, String)>[
+      ('${(stats.minutesTotales / 60).round()} h', 'vues'),
+      ('${stats.episodesVus}', 'épisodes'),
+      ('${stats.filmsVus}', 'films'),
+      ('${stats.seriesTerminees}', 'séries finies'),
+    ];
+    return Row(
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(child: _MiniStat(valeur: items[i].$1, libelle: items[i].$2)),
+        ],
+      ],
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String valeur;
+  final String libelle;
+  const _MiniStat({required this.valeur, required this.libelle});
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+        child: Column(
+          children: [
+            Text(valeur,
+                style: typo.titleMedium?.copyWith(color: CouleursSW.accent),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 3),
+            Text(libelle,
+                style: typo.labelSmall,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
+          ],
+        ),
       ),
     );
   }

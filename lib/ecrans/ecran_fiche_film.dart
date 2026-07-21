@@ -22,6 +22,8 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
   late Future<FilmPublic> _film;
   late Future<PlateformesVisionnage> _plateformes;
   late Future<List<ResultatRecherche>> _similaires;
+  bool _dejaVu = false; // état calculé côté API (présence dans visionner_film)
+  int _nbVus = 0;
 
   @override
   void initState() {
@@ -29,6 +31,21 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
     _film = _charger();
     _plateformes = _chargerPlateformes();
     _similaires = _chargerSimilaires();
+    _chargerEtatVu();
+  }
+
+  Future<void> _chargerEtatVu() async {
+    try {
+      final etat = await api.get('/films/${widget.referenceTmdb}/vu')
+          as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _dejaVu = etat['deja_vu'] as bool;
+        _nbVus = etat['nombre_visionnages'] as int;
+      });
+    } catch (_) {
+      // silencieux : on garde l'état par défaut (non vu)
+    }
   }
 
   Future<FilmPublic> _charger() async => FilmPublic.depuisJson(
@@ -50,8 +67,15 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
 
   Future<void> _marquerVu() async {
     try {
-      await api.post('/films/${widget.referenceTmdb}/vu');
-      _snack('Film marqué vu ✓');
+      final res = await api.post('/films/${widget.referenceTmdb}/vu')
+          as Map<String, dynamic>;
+      if (mounted) {
+        setState(() {
+          _dejaVu = true;
+          _nbVus = res['nombre_visionnages'] as int;
+        });
+      }
+      _snack(_nbVus > 1 ? 'Revu ✓ ($_nbVus fois)' : 'Film marqué vu ✓');
     } on ExceptionApi catch (e) {
       _snack(e.message);
     }
@@ -120,10 +144,19 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
               BlocNoterFiche(
                   idFilm: film.idFilm, noteTmdb: film.noteMoyenneTmdb),
               const SizedBox(height: 16),
-              ElevatedButton.icon(
-                  onPressed: _marquerVu,
-                  icon: const Icon(Icons.check, size: 20),
-                  label: const Text('Marquer vu')),
+              _dejaVu
+                  ? ElevatedButton.icon(
+                      onPressed: _marquerVu, // re-tap = revu (revoir un film)
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CouleursSW.succes,
+                        foregroundColor: CouleursSW.fond,
+                      ),
+                      icon: const Icon(Icons.check_circle, size: 20),
+                      label: Text(_nbVus > 1 ? 'Vu · $_nbVus fois' : 'Vu'))
+                  : ElevatedButton.icon(
+                      onPressed: _marquerVu,
+                      icon: const Icon(Icons.check, size: 20),
+                      label: const Text('Marquer vu')),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _aVoir,
