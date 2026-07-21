@@ -270,12 +270,17 @@ class StatsGlobales {
 class PeriodeStats {
   final DateTime periode;
   final int episodesVus;
-  final int minutes;
+  final int filmsVus;
+  final int minutes; // épisodes + films confondus
 
   PeriodeStats.depuisJson(Map<String, dynamic> json)
       : periode = DateTime.parse(json['periode'] as String),
         episodesVus = json['episodes_vus'] as int,
+        filmsVus = json['films_vus'] as int,
         minutes = json['minutes'] as int;
+
+  /// Total de visionnages de la semaine (un épisode et un film comptent chacun 1).
+  int get visionnages => episodesVus + filmsVus;
 }
 
 class NotificationPublique {

@@ -7,6 +7,16 @@ import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/format.dart';
 
+/// « 3 ép. · 1 film · 2h10 » — détail d'une semaine (parties à zéro masquées).
+String _detailVisionnages(PeriodeStats p) {
+  final parts = [
+    if (p.episodesVus > 0) '${p.episodesVus} ép.',
+    if (p.filmsVus > 0) '${p.filmsVus} film${p.filmsVus > 1 ? "s" : ""}',
+  ];
+  final compte = parts.isEmpty ? '0' : parts.join(' · ');
+  return '$compte · ${formatDuree(p.minutes)}';
+}
+
 class EcranStats extends StatefulWidget {
   const EcranStats({super.key});
 
@@ -70,6 +80,7 @@ class _EcranStatsState extends State<EcranStats> {
             orElse: () => PeriodeStats.depuisJson({
               'periode': semaine.toIso8601String(),
               'episodes_vus': 0,
+              'films_vus': 0,
               'minutes': 0,
             }),
           );
@@ -118,8 +129,11 @@ class _EcranStatsState extends State<EcranStats> {
                   ],
                 ),
                 const SizedBox(height: 28),
-                Text('Activité — 7 dernières semaines',
+                Text('Visionnages par semaine',
                     style: typo.titleMedium),
+                const SizedBox(height: 2),
+                Text('Épisodes + films, sur les 7 dernières semaines',
+                    style: typo.bodySmall),
                 const SizedBox(height: 14),
                 _GraphiqueBarres(semaines: semaines),
                 const SizedBox(height: 28),
@@ -129,7 +143,7 @@ class _EcranStatsState extends State<EcranStats> {
                   Card(
                       child: Padding(
                           padding: const EdgeInsets.all(24),
-                          child: Text('Aucun épisode vu pour l’instant.',
+                          child: Text('Aucun visionnage pour l’instant.',
                               style: typo.bodySmall,
                               textAlign: TextAlign.center)))
                 else
@@ -145,7 +159,7 @@ class _EcranStatsState extends State<EcranStats> {
                                 style: typo.bodyMedium),
                             const Spacer(),
                             Text(
-                                '${periode.episodesVus} ép. · ${formatDuree(periode.minutes)}',
+                                _detailVisionnages(periode),
                                 style: typo.bodySmall?.copyWith(
                                     color: CouleursSW.accent,
                                     fontWeight: FontWeight.w600)),
@@ -197,16 +211,19 @@ class _GraphiqueBarres extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxi = semaines.fold<int>(0,
-        (acc, p) => p.episodesVus > acc ? p.episodesVus : acc);
+    final typo = Theme.of(context).textTheme;
+    final maxi = semaines.fold<int>(
+        0, (acc, p) => p.visionnages > acc ? p.visionnages : acc);
     return Card(
       child: Container(
-        height: 180,
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+        // hauteur interne = 190 - 14 - 12 = 164 ; colonne max :
+        // nombre 16 + 4 + barre (8+108) + 6 + label 16 = 158 < 164 → pas d'overflow
+        height: 190,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: maxi == 0
             ? Center(
-                child: Text('Aucune activité sur la période.',
-                    style: Theme.of(context).textTheme.bodySmall))
+                child: Text('Aucun épisode vu sur les 7 dernières semaines.',
+                    style: typo.bodySmall, textAlign: TextAlign.center))
             : Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -215,21 +232,30 @@ class _GraphiqueBarres extends StatelessWidget {
                     Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
+                        // nombre de visionnages de la semaine : repère de hauteur
+                        Text('${periode.visionnages}',
+                            style: typo.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: periode.visionnages == maxi
+                                    ? CouleursSW.accentSecondaire
+                                    : CouleursSW.texteSecondaire)),
+                        const SizedBox(height: 4),
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           width: 26,
-                          height: 8 + 120 * (periode.episodesVus / maxi),
+                          height: 8 + 108 * (periode.visionnages / maxi),
                           decoration: BoxDecoration(
-                            // la meilleure semaine ressort en cyan, cf. maquette
-                            color: periode.episodesVus == maxi
+                            // la meilleure semaine ressort en cyan
+                            color: periode.visionnages == maxi
                                 ? CouleursSW.accentSecondaire
                                 : CouleursSW.accent,
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text('${periode.periode.day}',
-                            style: Theme.of(context).textTheme.labelSmall),
+                        const SizedBox(height: 6),
+                        // lundi de la semaine, jour/mois (le mois lève la confusion)
+                        Text('${periode.periode.day}/${periode.periode.month}',
+                            style: typo.labelSmall),
                       ],
                     ),
                 ],
