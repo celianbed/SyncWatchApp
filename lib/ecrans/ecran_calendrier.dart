@@ -35,8 +35,13 @@ class _EcranCalendrierState extends State<EcranCalendrier> {
   }
 
   Future<void> _rafraichir() async {
-    setState(() => _entrees = _charger());
-    await _entrees;
+    // corps en bloc : « () => _entrees = _charger() » renverrait le Future de
+    // l'affectation, ce que setState refuse.
+    final futur = _charger();
+    setState(() {
+      _entrees = futur;
+    });
+    await futur;
   }
 
   /// Groupe les entrées (déjà triées par l'API) par jour de diffusion.

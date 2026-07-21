@@ -43,8 +43,13 @@ class _EcranStatsState extends State<EcranStats> {
   }
 
   Future<void> _rafraichir() async {
-    setState(() => _donnees = _charger());
-    await _donnees;
+    // corps en bloc : la closure ne doit rien retourner (sinon setState râle car
+    // « () => _donnees = _charger() » renvoie le Future de l'affectation).
+    final futur = _charger();
+    setState(() {
+      _donnees = futur;
+    });
+    await futur;
   }
 
   /// Les 7 dernières semaines, les manquantes à zéro.
