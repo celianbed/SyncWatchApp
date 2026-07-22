@@ -90,6 +90,26 @@ class _EcranConnexionState extends State<EcranConnexion> {
     }
   }
 
+  Future<void> _connexionGoogle() async {
+    setState(() => _chargement = true);
+    try {
+      await context.read<Session>().connexionGoogle();
+      // succès : main.dart bascule vers la coquille via le Consumer<Session>
+    } on ExceptionApi catch (e) {
+      if (mounted && e.message.isNotEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _chargement = false);
+    }
+  }
+
   /// Affiche le panneau d'attente de vérification en mémorisant de quoi sonder
   /// la connexion (identifiant + mot de passe) et pré-remplir le renvoi de mail.
   void _ouvrirPanneauVerification(String identifiant, String mailPourRenvoi) {
@@ -314,6 +334,44 @@ class _EcranConnexionState extends State<EcranConnexion> {
                                           ? 'Créer mon compte'
                                           : 'Se connecter',
                                     ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                    child: Divider(
+                                        color: Colors.white
+                                            .withValues(alpha: .12))),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12),
+                                  child: Text('ou', style: typo.bodySmall),
+                                ),
+                                Expanded(
+                                    child: Divider(
+                                        color: Colors.white
+                                            .withValues(alpha: .12))),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed:
+                                  _chargement ? null : _connexionGoogle,
+                              icon: const Text('G',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: Color(0xFF4285F4))),
+                              label: const Text('Continuer avec Google'),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                                foregroundColor: CouleursSW.texte,
+                                side: BorderSide(
+                                    color: Colors.white
+                                        .withValues(alpha: .18)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14)),
+                              ),
                             ),
                           ],
                         ),

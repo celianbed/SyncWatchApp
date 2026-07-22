@@ -25,6 +25,8 @@ dependencies:
   # Push notifications (Android) — nouvel épisode d'une série suivie
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.5
+  # Connexion Google
+  google_sign_in: ^6.2.2
 
 dev_dependencies:
   flutter_test:

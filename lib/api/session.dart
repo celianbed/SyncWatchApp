@@ -1,10 +1,19 @@
 // Session utilisateur : jeton JWT (trousseau iOS) + profil courant.
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../modeles/modeles.dart';
 import '../services/push.dart';
 import 'client_api.dart';
+
+// ID du client OAuth « Web » Firebase (= GOOGLE_CLIENT_ID côté API). Public (pas secret).
+// ⬇️ COLLE ta valeur ici (…apps.googleusercontent.com) — laisse '' tant que non configuré.
+const _googleServerClientId = '';
+
+final _googleSignIn = GoogleSignIn(
+  serverClientId: _googleServerClientId.isEmpty ? null : _googleServerClientId,
+);
 
 class Session extends ChangeNotifier {
   static const _cleJeton = 'jeton_syncwatch';
@@ -42,6 +51,18 @@ class Session extends ChangeNotifier {
 
   Future<void> connexion(String identifiant, String motDePasse) async {
     await connecterAvecJeton(await api.connexion(identifiant, motDePasse));
+  }
+
+  /// Connexion via Google : ouvre le sélecteur de compte, récupère l'id_token,
+  /// et le fait valider par l'API (qui crée/lie le compte).
+  Future<void> connexionGoogle() async {
+    final compte = await _googleSignIn.signIn();
+    if (compte == null) return; // annulé par l'utilisateur
+    final idToken = (await compte.authentication).idToken;
+    if (idToken == null) throw ExceptionApi(0, 'Jeton Google indisponible.');
+    final donnees = await api.post('/auth/google',
+        corps: {'id_token': idToken}) as Map<String, dynamic>;
+    await connecterAvecJeton(donnees['access_token'] as String);
   }
 
   /// Finalise la session à partir d'un jeton déjà obtenu (utilisé par le sondage
@@ -91,6 +112,7 @@ class Session extends ChangeNotifier {
     api.jeton = null;
     utilisateur = null;
     await _stockage.delete(key: _cleJeton);
+    _googleSignIn.signOut(); // pour re-choisir le compte au prochain login Google
     notifyListeners();
   }
 
