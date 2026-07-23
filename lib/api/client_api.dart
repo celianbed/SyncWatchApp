@@ -13,6 +13,22 @@ class ExceptionApi implements Exception {
   String toString() => message;
 }
 
+/// Message affichable à l'utilisateur pour une réponse en erreur.
+/// L'API renvoie `detail` (en français) ; on ne rédige ici que les cas où ce
+/// n'est pas exploitable — ex. 429, dont le corps slowapi est technique et anglais.
+String _messageErreur(http.Response reponse) {
+  var message = reponse.statusCode == 429
+      ? 'Trop de tentatives. Réessaie dans quelques minutes.'
+      : 'Erreur ${reponse.statusCode}';
+  try {
+    final corps = jsonDecode(utf8.decode(reponse.bodyBytes));
+    if (corps is Map && corps['detail'] is String) {
+      message = corps['detail'] as String;
+    }
+  } catch (_) {}
+  return message;
+}
+
 class ClientApi {
   static const urlBase = String.fromEnvironment('SYNCWATCH_API',
       defaultValue: 'https://syncwatch-b3tv.onrender.com');
@@ -37,14 +53,7 @@ class ClientApi {
   dynamic _decoder(http.Response reponse) {
     if (reponse.statusCode == 401 && jeton != null) surNonAutorise?.call();
     if (reponse.statusCode >= 400) {
-      var message = 'Erreur ${reponse.statusCode}';
-      try {
-        final corps = jsonDecode(utf8.decode(reponse.bodyBytes));
-        if (corps is Map && corps['detail'] is String) {
-          message = corps['detail'] as String;
-        }
-      } catch (_) {}
-      throw ExceptionApi(reponse.statusCode, message);
+      throw ExceptionApi(reponse.statusCode, _messageErreur(reponse));
     }
     if (reponse.bodyBytes.isEmpty) return null;
     return jsonDecode(utf8.decode(reponse.bodyBytes));

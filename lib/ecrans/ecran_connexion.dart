@@ -1,5 +1,6 @@
 // Connexion / inscription — email ou pseudo + mot de passe.
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -137,6 +138,9 @@ class _EcranConnexionState extends State<EcranConnexion> {
     setState(() {
       _mailAverifier = null;
       _inscription = false;
+      // ne pas garder le mot de passe en clair en mémoire une fois le sondage fini
+      _identifiantAverifier = '';
+      _mdpAverifier = '';
     });
   }
 
@@ -335,6 +339,9 @@ class _EcranConnexionState extends State<EcranConnexion> {
                                           : 'Se connecter',
                                     ),
                             ),
+                            // Bouton Google : Android uniquement — iOS n'est pas
+                            // configuré pour Google Sign-In (le plugin crashe nativement).
+                            if (Platform.isAndroid) ...[
                             const SizedBox(height: 16),
                             Row(
                               children: [
@@ -373,6 +380,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
                                     borderRadius: BorderRadius.circular(14)),
                               ),
                             ),
+                            ],
                           ],
                         ),
                       ),
@@ -593,10 +601,11 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
   @override
   void initState() {
     super.initState();
-    // sonde tout de suite puis toutes les 3 s, tant que non vérifié
+    // Sonde tout de suite puis toutes les 5 s, tant que non vérifié.
+    // 5 s = 12 appels/min : sous le quota de /auth/connexion (30/min côté API).
     _sonder();
     _minuteurSondage = Timer.periodic(
-      const Duration(seconds: 3),
+      const Duration(seconds: 5),
       (_) => _sonder(),
     );
   }
@@ -624,8 +633,8 @@ class _PanneauVerificationState extends State<_PanneauVerification> {
       await context.read<Session>().connecterAvecJeton(jeton);
       // main.dart bascule vers la Coquille via le Consumer<Session>
     } on ExceptionApi catch (e) {
-      // 403 = pas encore vérifié → on réessaiera au prochain tick
-      if (e.code != 403 && mounted) {
+      // 403 = pas encore vérifié, 429 = quota atteint → on réessaiera au prochain tick
+      if (e.code != 403 && e.code != 429 && mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(e.message)));

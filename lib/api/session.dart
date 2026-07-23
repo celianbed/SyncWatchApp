@@ -8,8 +8,7 @@ import '../services/push.dart';
 import 'client_api.dart';
 
 // ID du client OAuth « Web » Firebase (= GOOGLE_CLIENT_ID côté API). Public (pas secret).
-// ⬇️ COLLE ta valeur ici (…apps.googleusercontent.com) — laisse '' tant que non configuré.
-const _googleServerClientId = '';
+const _googleServerClientId = '342313200348-248mobi7fb49faq2792b57d0djlfncce.apps.googleusercontent.com';
 
 final _googleSignIn = GoogleSignIn(
   serverClientId: _googleServerClientId.isEmpty ? null : _googleServerClientId,
