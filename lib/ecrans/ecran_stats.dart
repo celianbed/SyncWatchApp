@@ -6,6 +6,7 @@ import '../api/client_api.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/format.dart';
+import '../widgets/chargeur_async.dart';
 
 /// « 3 ép. · 1 film · 2h10 » — détail d'une semaine (parties à zéro masquées).
 String _detailVisionnages(PeriodeStats p) {
@@ -94,19 +95,11 @@ class _EcranStatsState extends State<EcranStats> {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: _rafraichir,
-        child: FutureBuilder(
+        child: ChargeurAsync<(StatsGlobales, List<PeriodeStats>)>(
           future: _donnees,
-          builder: (context, instantane) {
-            if (instantane.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (instantane.hasError) {
-              return ListView(padding: const EdgeInsets.all(24), children: [
-                Text('${instantane.error}',
-                    style: typo.bodySmall, textAlign: TextAlign.center)
-              ]);
-            }
-            final (stats, historique) = instantane.data!;
+          surReessayer: _rafraichir,
+          enfant: (donnees) {
+            final (stats, historique) = donnees;
             final semaines = _septSemaines(historique);
             return ListView(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),

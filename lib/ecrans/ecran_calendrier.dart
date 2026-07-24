@@ -7,6 +7,7 @@ import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/format.dart';
 import '../widgets/affiche_tmdb.dart';
+import '../widgets/chargeur_async.dart';
 import 'ecran_fiche_serie.dart';
 
 class EcranCalendrier extends StatefulWidget {
@@ -65,24 +66,11 @@ class _EcranCalendrierState extends State<EcranCalendrier> {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: _rafraichir,
-        child: FutureBuilder(
+        child: ChargeurAsync<List<CalendrierEntree>>(
           future: _entrees,
-          builder: (context, instantane) {
-            if (instantane.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (instantane.hasError) {
-              // ListView : reste compatible avec le tirer-pour-rafraîchir
-              return ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  _MessageVide(
-                      icone: Icons.cloud_off,
-                      texte: 'API injoignable.\n${instantane.error}'),
-                ],
-              );
-            }
-            final groupes = _parJour(instantane.data ?? []);
+          surReessayer: _rafraichir,
+          enfant: (donnees) {
+            final groupes = _parJour(donnees);
             return ListView(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               children: [

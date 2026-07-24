@@ -61,11 +61,15 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
     ];
   }
 
-  Future<void> _charger() async {
-    setState(() {
-      _chargement = true;
-      _erreur = null;
-    });
+  /// [silencieux] : rafraîchit les données SANS afficher le spinner plein écran
+  /// (utilisé après une action optimiste — le contenu se met à jour en place).
+  Future<void> _charger({bool silencieux = false}) async {
+    if (!silencieux) {
+      setState(() {
+        _chargement = true;
+        _erreur = null;
+      });
+    }
     try {
       final serie = SeriePublique.depuisJson(
           await api.get('/series/${widget.referenceTmdb}')
@@ -114,6 +118,8 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
       });
     } catch (e) {
       if (!mounted) return;
+      // en silencieux, on ne blanchit pas la page : on garde le contenu affiché
+      if (silencieux) return;
       setState(() {
         _erreur = e.toString();
         _chargement = false;
@@ -122,30 +128,41 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
   }
 
   Future<void> _suivre() async {
+    final avant = _suivi;
+    // optimiste : le bouton passe à « suivi » immédiatement
+    setState(() => _suivi = SuiviPublic.depuisJson(
+        const {'statut_suivi': 'en_cours', 'favori': false}));
     try {
       await api.post('/series/${widget.referenceTmdb}/suivre',
           corps: const {'statut_suivi': 'en_cours'});
-      await _charger();
+      // suivre remplit le cache (saisons, épisodes) : on les charge en fond, sans spinner
+      await _charger(silencieux: true);
     } on ExceptionApi catch (e) {
+      if (mounted) setState(() => _suivi = avant); // rollback
       _snack(e.message);
     }
   }
 
   Future<void> _changerStatut(String statut) async {
+    final avant = _suivi;
+    setState(() => _suivi = SuiviPublic.depuisJson(
+        {'statut_suivi': statut, 'favori': avant?.favori ?? false}));
     try {
       await api.patch('/series/${widget.referenceTmdb}/suivre',
           corps: {'statut_suivi': statut});
-      await _charger();
     } on ExceptionApi catch (e) {
+      if (mounted) setState(() => _suivi = avant); // rollback
       _snack(e.message);
     }
   }
 
   Future<void> _nePlusSuivre() async {
+    final avant = _suivi;
+    setState(() => _suivi = null); // optimiste
     try {
       await api.delete('/series/${widget.referenceTmdb}/suivre');
-      await _charger();
     } on ExceptionApi catch (e) {
+      if (mounted) setState(() => _suivi = avant); // rollback
       _snack(e.message);
     }
   }
@@ -153,7 +170,7 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
   Future<void> _marquerEpisodeVu(int idEpisode) async {
     try {
       await api.post('/episodes/$idEpisode/vu');
-      await _charger();
+      await _charger(silencieux: true); // maj de la progression sans spinner global
     } on ExceptionApi catch (e) {
       _snack(e.message);
     }
@@ -163,7 +180,7 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
     try {
       await api.post('/saisons/${saison.idSaison}/vu');
       _snack('Saison ${saison.numSaison} marquée vue ✓');
-      await _charger();
+      await _charger(silencieux: true);
     } on ExceptionApi catch (e) {
       _snack(e.message);
     }

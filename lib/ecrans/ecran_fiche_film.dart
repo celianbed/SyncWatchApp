@@ -66,17 +66,24 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
   }
 
   Future<void> _marquerVu() async {
+    final avantVu = _dejaVu, avantNb = _nbVus;
+    // optimiste : le bouton passe à « Vu » immédiatement
+    setState(() {
+      _dejaVu = true;
+      _nbVus = _nbVus + 1;
+    });
     try {
       final res = await api.post('/films/${widget.referenceTmdb}/vu')
           as Map<String, dynamic>;
-      if (mounted) {
-        setState(() {
-          _dejaVu = true;
-          _nbVus = res['nombre_visionnages'] as int;
-        });
-      }
+      if (mounted) setState(() => _nbVus = res['nombre_visionnages'] as int);
       _snack(_nbVus > 1 ? 'Revu ✓ ($_nbVus fois)' : 'Film marqué vu ✓');
     } on ExceptionApi catch (e) {
+      if (mounted) {
+        setState(() {
+          _dejaVu = avantVu;
+          _nbVus = avantNb;
+        });
+      }
       _snack(e.message);
     }
   }
