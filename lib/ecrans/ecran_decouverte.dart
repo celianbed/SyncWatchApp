@@ -2,7 +2,6 @@
 // tendance. Un seul lecteur YouTube partagé : on change de vidéo au swipe
 // (loadVideoById) plutôt que d'instancier une WebView par page.
 import 'dart:async';
-import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -33,20 +32,11 @@ class _EcranDecouverteState extends State<EcranDecouverte>
   int _index = 0;
   bool _muet = true;
   bool _enLecture = true;
+  bool _demarrageForce = false; // évite de relancer play en boucle sur une même vidéo
   bool _videoIndisponible = false; // trailer avec intégration bloquée (erreur YouTube)
   bool _chargement = false;
   String? _erreur;
   final Set<String> _ajoutes = {}; // "type:reference" déjà suivis pendant la session
-
-  // UA « navigateur complet » : la WebView envoie sinon une UA tronquée que
-  // YouTube peut flagguer (erreur 152). On se fait passer pour Safari / Chrome
-  // mobile selon la plateforme, ce qui fiabilise la lecture intégrée.
-  static final String _userAgent = Platform.isAndroid
-      ? 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 '
-          '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
-      : 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
-          'AppleWebKit/605.1.15 (KHTML, like Gecko) '
-          'Version/17.0 Mobile/15E148 Safari/604.1';
 
   @override
   void initState() {
@@ -87,11 +77,29 @@ class _EcranDecouverteState extends State<EcranDecouverte>
     super.dispose();
   }
 
-  /// Suit l'état du lecteur : détecte les vidéos non intégrables (erreur YouTube).
+  /// Suit l'état réel du lecteur : détecte les vidéos non intégrables, synchronise
+  /// l'état lecture/pause, et force le démarrage si le lecteur reste « cued ».
   void _surEtatLecteur(YoutubePlayerValue valeur) {
     final indisponible = valeur.error != YoutubeError.none;
-    if (indisponible != _videoIndisponible && mounted) {
-      setState(() => _videoIndisponible = indisponible);
+    final etat = valeur.playerState;
+    final joue = etat == PlayerState.playing;
+
+    // Coup de pouce : certains WKWebView chargent la vidéo en pause (cued) malgré
+    // autoPlay. Dès qu'elle est prête et que l'onglet est actif, on lance.
+    if (!_demarrageForce &&
+        widget.actif &&
+        (etat == PlayerState.cued || etat == PlayerState.unStarted)) {
+      _demarrageForce = true;
+      _controleur?.playVideo();
+      if (_muet) _controleur?.mute();
+    }
+
+    if (mounted &&
+        (indisponible != _videoIndisponible || joue != _enLecture)) {
+      setState(() {
+        _videoIndisponible = indisponible;
+        _enLecture = joue;
+      });
     }
   }
 
@@ -113,16 +121,16 @@ class _EcranDecouverteState extends State<EcranDecouverte>
           : YoutubePlayerController.fromVideoId(
               videoId: items.first.cleYoutube,
               autoPlay: widget.actif,
-              params: YoutubePlayerParams(
+              params: const YoutubePlayerParams(
                 showControls: false,
                 showFullscreenButton: false,
                 mute: true, // démarrage muet = autoplay fiable ; l'utilisateur active le son
                 enableCaption: false,
                 loop: false,
-                // origin explicite : fournit un Referer valide au lecteur intégré,
-                // sinon certaines vidéos renvoient l'erreur 152/153 dans la WebView
-                origin: 'https://www.youtube.com',
-                userAgent: _userAgent,
+                // origin: null → aucun param origin. La vraie origine est le
+                // serveur local 127.0.0.1 (cf. patch de la lib) : on reproduit
+                // exactement le test navigateur qui fonctionne.
+                origin: null,
               ),
             );
       _sousEtat = ctrl?.stream.listen(_surEtatLecteur);
@@ -130,6 +138,7 @@ class _EcranDecouverteState extends State<EcranDecouverte>
         _items = items;
         _controleur = ctrl;
         _index = 0;
+        _demarrageForce = false;
         _videoIndisponible = false;
         _enLecture = true;
         _chargement = false;
@@ -146,9 +155,9 @@ class _EcranDecouverteState extends State<EcranDecouverte>
   void _changerPage(int i) {
     setState(() {
       _index = i;
-      _enLecture = true;
       _videoIndisponible = false;
     });
+    _demarrageForce = false; // nouvelle vidéo → un nouveau coup de pouce autorisé
     _controleur?.loadVideoById(videoId: _items[i].cleYoutube);
     if (_muet) _controleur?.mute(); // loadVideoById peut réactiver le son
   }
@@ -161,8 +170,8 @@ class _EcranDecouverteState extends State<EcranDecouverte>
   }
 
   void _basculerLecture() {
-    setState(() => _enLecture = !_enLecture);
-    _enLecture ? _controleur?.playVideo() : _controleur?.pauseVideo();
+    // agit sur l'état RÉEL ; l'UI se met à jour via _surEtatLecteur (le stream)
+    _enLecture ? _controleur?.pauseVideo() : _controleur?.playVideo();
   }
 
   void _basculerSon() {

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
+import 'dart:io'; // PATCH SyncWatch : micro-serveur local (origine réelle)
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -274,23 +275,35 @@ class YoutubePlayerController implements YoutubePlayerIFrameAPI {
       'host': params.origin ?? 'https://www.youtube.com',
     };
 
-    // === TEST ORIGINE (SyncWatch) — à retirer après validation ===
-    // Charge l'embed via une VRAIE URL HTTPS (origine youtube.com réelle) au lieu
-    // de loadHtmlString (origine opaque sur iOS → soupçonné responsable du 152).
-    // But : voir si la 1re vidéo JOUE. Le contrôle JS (play/pause/swipe) est cassé
-    // pendant ce test, c'est normal.
-    if (!kIsWeb && key != null && key!.isNotEmpty) {
-      await webViewController.loadRequest(Uri.parse(
-        'https://www.youtube.com/embed/${key!}'
-        '?autoplay=1&mute=1&playsinline=1&rel=0&controls=0',
-      ));
+    final html = await _buildPlayerHTML(playerData);
+
+    // PATCH SyncWatch : sur mobile, on sert le lecteur depuis un micro-serveur
+    // local (http://127.0.0.1) et on le charge par URL réelle. Ainsi la page a une
+    // VRAIE origine (contrairement à loadHtmlString, qui donne une origine opaque
+    // sur iOS → erreur 152). L'iframe YouTube a alors un referrer valide et joue.
+    if (!kIsWeb) {
+      await webViewController.loadRequest(await _servirLocalement(html));
       return;
     }
 
-    await webViewController.loadHtmlString(
-      await _buildPlayerHTML(playerData),
-      baseUrl: baseUrl,
-    );
+    await webViewController.loadHtmlString(html, baseUrl: baseUrl);
+  }
+
+  HttpServer? _serveurLocal;
+
+  /// Sert [html] sur 127.0.0.1 (port éphémère) et renvoie son URL.
+  Future<Uri> _servirLocalement(String html) async {
+    await _serveurLocal?.close(force: true);
+    final serveur = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    _serveurLocal = serveur;
+    serveur.listen((requete) async {
+      requete.response
+        ..statusCode = 200
+        ..headers.contentType = ContentType.html
+        ..write(html);
+      await requete.response.close();
+    });
+    return Uri.parse('http://127.0.0.1:${serveur.port}/');
   }
 
   Future<void> _run(
@@ -701,6 +714,7 @@ class YoutubePlayerController implements YoutubePlayerIFrameAPI {
     await webViewController.removeJavaScriptChannel('youtube-$hashCode');
     await _eventHandler.videoStateController.close();
     await _valueController.close();
+    await _serveurLocal?.close(force: true); // PATCH SyncWatch : arrête le serveur local
   }
 }
 
