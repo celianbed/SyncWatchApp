@@ -27,6 +27,8 @@ dependencies:
   firebase_messaging: ^15.1.5
   # Connexion Google
   google_sign_in: ^6.2.2
+  # Lecteur YouTube inline (feed de bandes-annonces « Extraits »)
+  youtube_player_iframe: ^5.2.0
 
 dev_dependencies:
   flutter_test:

@@ -1,0 +1,399 @@
+// Extraits — feed vertical (façon Reels) des bandes-annonces des titres en
+// tendance. Un seul lecteur YouTube partagé : on change de vidéo au swipe
+// (loadVideoById) plutôt que d'instancier une WebView par page.
+import 'package:flutter/material.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+
+import '../api/client_api.dart';
+import '../modeles/modeles.dart';
+import '../theme.dart';
+import 'ecran_fiche_film.dart';
+import 'ecran_fiche_serie.dart';
+
+class EcranDecouverte extends StatefulWidget {
+  /// Vrai quand l'onglet est affiché : le lecteur ne joue que dans ce cas.
+  final bool actif;
+  const EcranDecouverte({super.key, required this.actif});
+
+  @override
+  State<EcranDecouverte> createState() => _EcranDecouverteState();
+}
+
+class _EcranDecouverteState extends State<EcranDecouverte>
+    with WidgetsBindingObserver {
+  List<ExtraitFeed> _items = [];
+  YoutubePlayerController? _controleur;
+  bool _muet = true;
+  bool _enLecture = true;
+  bool _chargement = false;
+  String? _erreur;
+  final Set<String> _ajoutes = {}; // "type:reference" déjà suivis pendant la session
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (widget.actif) _charger();
+  }
+
+  @override
+  void didUpdateWidget(EcranDecouverte ancien) {
+    super.didUpdateWidget(ancien);
+    if (ancien.actif == widget.actif) return;
+    if (widget.actif) {
+      if (_items.isEmpty && !_chargement) {
+        _charger(); // chargement paresseux : à la première ouverture de l'onglet
+      } else if (_enLecture) {
+        _controleur?.playVideo();
+      }
+    } else {
+      _controleur?.pauseVideo(); // onglet quitté : on met en pause
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState etat) {
+    if (etat != AppLifecycleState.resumed) {
+      _controleur?.pauseVideo();
+    } else if (widget.actif && _enLecture) {
+      _controleur?.playVideo();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controleur?.close();
+    super.dispose();
+  }
+
+  Future<void> _charger() async {
+    setState(() {
+      _chargement = true;
+      _erreur = null;
+    });
+    try {
+      final donnees = await api.get('/decouverte/extraits') as List;
+      final items = [
+        for (final e in donnees) ExtraitFeed.depuisJson(e as Map<String, dynamic>)
+      ];
+      if (!mounted) return;
+      _controleur?.close();
+      final ctrl = items.isEmpty
+          ? null
+          : YoutubePlayerController.fromVideoId(
+              videoId: items.first.cleYoutube,
+              autoPlay: widget.actif,
+              params: const YoutubePlayerParams(
+                showControls: false,
+                showFullscreenButton: false,
+                mute: true, // démarrage muet = autoplay fiable ; l'utilisateur active le son
+                enableCaption: false,
+                loop: false,
+              ),
+            );
+      setState(() {
+        _items = items;
+        _controleur = ctrl;
+        _enLecture = true;
+        _chargement = false;
+      });
+    } on ExceptionApi catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _erreur = e.message;
+        _chargement = false;
+      });
+    }
+  }
+
+  void _changerPage(int i) {
+    setState(() => _enLecture = true);
+    _controleur?.loadVideoById(videoId: _items[i].cleYoutube);
+    if (_muet) _controleur?.mute(); // loadVideoById peut réactiver le son
+  }
+
+  void _basculerLecture() {
+    setState(() => _enLecture = !_enLecture);
+    _enLecture ? _controleur?.playVideo() : _controleur?.pauseVideo();
+  }
+
+  void _basculerSon() {
+    setState(() => _muet = !_muet);
+    _muet ? _controleur?.mute() : _controleur?.unMute();
+  }
+
+  Future<void> _suivre(ExtraitFeed e) async {
+    final cle = '${e.type}:${e.referenceTmdb}';
+    final chemin = e.estSerie
+        ? '/series/${e.referenceTmdb}/suivre'
+        : '/films/${e.referenceTmdb}/suivre';
+    try {
+      await api.post(chemin);
+      if (!mounted) return;
+      setState(() => _ajoutes.add(cle));
+      _message(e.estSerie ? 'Ajoutée à tes séries' : 'Ajouté à ta liste à voir');
+    } on ExceptionApi catch (ex) {
+      if (!mounted) return;
+      if (ex.code == 409) {
+        setState(() => _ajoutes.add(cle)); // déjà suivi = objectif atteint
+        _message('Déjà dans ta liste');
+      } else {
+        _message(ex.message);
+      }
+    }
+  }
+
+  void _ouvrirFiche(ExtraitFeed e) {
+    _controleur?.pauseVideo();
+    setState(() => _enLecture = false);
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+          builder: (_) => e.estSerie
+              ? EcranFicheSerie(referenceTmdb: e.referenceTmdb)
+              : EcranFicheFilm(referenceTmdb: e.referenceTmdb),
+        ))
+        .then((_) {
+      if (widget.actif && mounted) {
+        setState(() => _enLecture = true);
+        _controleur?.playVideo();
+      }
+    });
+  }
+
+  void _message(String texte) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_chargement) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_erreur != null) {
+      return _Erreur(message: _erreur!, surReessayer: _charger);
+    }
+    if (_items.isEmpty) {
+      return const _MessageVide();
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: CouleursSW.fond),
+        // Lecteur unique, centré, non interactif : tous les gestes vont au PageView.
+        Center(
+          child: IgnorePointer(
+            child: YoutubePlayer(controller: _controleur!, aspectRatio: 16 / 9),
+          ),
+        ),
+        PageView.builder(
+          scrollDirection: Axis.vertical,
+          onPageChanged: _changerPage,
+          itemCount: _items.length,
+          itemBuilder: (context, i) {
+            final e = _items[i];
+            return _PageInfos(
+              extrait: e,
+              deja: _ajoutes.contains('${e.type}:${e.referenceTmdb}'),
+              surTap: _basculerLecture,
+              surSuivre: () => _suivre(e),
+              surDetail: () => _ouvrirFiche(e),
+            );
+          },
+        ),
+        // Icône « en pause » au centre quand la vidéo est arrêtée.
+        if (!_enLecture)
+          const IgnorePointer(
+            child: Center(
+              child: Icon(Icons.play_arrow_rounded,
+                  size: 88, color: Colors.white70),
+            ),
+          ),
+        // Bouton son en haut à droite (au-dessus du PageView → cliquable).
+        SafeArea(
+          child: Align(
+            alignment: Alignment.topRight,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: _BoutonRond(
+                icone: _muet ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                surTap: _basculerSon,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PageInfos extends StatelessWidget {
+  final ExtraitFeed extrait;
+  final bool deja;
+  final VoidCallback surTap;
+  final VoidCallback surSuivre;
+  final VoidCallback surDetail;
+
+  const _PageInfos({
+    required this.extrait,
+    required this.deja,
+    required this.surTap,
+    required this.surSuivre,
+    required this.surDetail,
+  });
+
+  String get _meta {
+    final parts = <String>[
+      if (extrait.annee != null) '${extrait.annee}',
+      extrait.estSerie ? 'Série' : 'Film',
+      if (extrait.noteMoyenne != null)
+        '★ ${extrait.noteMoyenne!.toStringAsFixed(1)}',
+    ];
+    return parts.join('  ·  ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: surTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 40, 20, 24),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Color(0xE60F172A), CouleursSW.fond],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(extrait.titre,
+                    style: typo.headlineMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 6),
+                Text(_meta,
+                    style: typo.bodySmall
+                        ?.copyWith(color: CouleursSW.accentSecondaire)),
+                if (extrait.apercu != null) ...[
+                  const SizedBox(height: 10),
+                  Text(extrait.apercu!,
+                      style: typo.bodySmall,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis),
+                ],
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: deja ? null : surSuivre,
+                        icon: Icon(deja
+                            ? Icons.check_rounded
+                            : Icons.add_rounded),
+                        label: Text(deja
+                            ? 'Ajouté'
+                            : (extrait.estSerie ? 'Suivre' : 'À voir')),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: surDetail,
+                      icon: const Icon(Icons.info_outline_rounded),
+                      label: const Text('Détail'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BoutonRond extends StatelessWidget {
+  final IconData icone;
+  final VoidCallback surTap;
+  const _BoutonRond({required this.icone, required this.surTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.45),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: surTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(icone, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageVide extends StatelessWidget {
+  const _MessageVide();
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.movie_outlined,
+                size: 48, color: CouleursSW.texteSecondaire),
+            const SizedBox(height: 16),
+            Text('Aucun extrait disponible pour le moment.',
+                style: typo.bodyMedium, textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Erreur extends StatelessWidget {
+  final String message;
+  final VoidCallback surReessayer;
+  const _Erreur({required this.message, required this.surReessayer});
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded,
+                size: 44, color: CouleursSW.texteSecondaire),
+            const SizedBox(height: 12),
+            Text(message, style: typo.bodyMedium, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: surReessayer,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

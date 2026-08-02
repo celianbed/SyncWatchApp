@@ -100,6 +100,32 @@ class ResultatRecherche {
         noteMoyenne = (json['note_moyenne'] as num?)?.toDouble();
 }
 
+/// Une entrée du feed « Extraits » : un titre en tendance + sa bande-annonce.
+class ExtraitFeed {
+  final int referenceTmdb;
+  final String type; // "serie" | "film"
+  final String titre;
+  final String? affiche;
+  final String? imageDeFond;
+  final String? apercu;
+  final int? annee;
+  final double? noteMoyenne;
+  final String cleYoutube;
+
+  ExtraitFeed.depuisJson(Map<String, dynamic> json)
+      : referenceTmdb = json['reference_tmdb'] as int,
+        type = json['type'] as String,
+        titre = json['titre'] as String,
+        affiche = json['affiche'] as String?,
+        imageDeFond = json['image_de_fond'] as String?,
+        apercu = json['apercu'] as String?,
+        annee = json['annee'] as int?,
+        noteMoyenne = (json['note_moyenne'] as num?)?.toDouble(),
+        cleYoutube = json['cle_youtube'] as String;
+
+  bool get estSerie => type == 'serie';
+}
+
 class Plateforme {
   final String nom;
   final String? logo;

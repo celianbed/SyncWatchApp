@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'ecran_accueil.dart';
 import 'ecran_calendrier.dart';
+import 'ecran_decouverte.dart';
 import 'ecran_profil.dart';
 import 'ecran_recherche.dart';
 import 'ecran_stats.dart';
@@ -22,12 +23,13 @@ class _CoquilleState extends State<Coquille> {
     return Scaffold(
       body: IndexedStack(
         index: _index,
-        children: const [
-          EcranAccueil(),
-          EcranRecherche(),
-          EcranCalendrier(),
-          EcranStats(),
-          EcranProfil(),
+        children: [
+          const EcranAccueil(),
+          EcranDecouverte(actif: _index == 1),
+          const EcranRecherche(),
+          const EcranCalendrier(),
+          const EcranStats(),
+          const EcranProfil(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -38,6 +40,10 @@ class _CoquilleState extends State<Coquille> {
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home),
               label: 'Accueil'),
+          NavigationDestination(
+              icon: Icon(Icons.play_circle_outline),
+              selectedIcon: Icon(Icons.play_circle),
+              label: 'Extraits'),
           NavigationDestination(
               icon: Icon(Icons.search), label: 'Recherche'),
           NavigationDestination(

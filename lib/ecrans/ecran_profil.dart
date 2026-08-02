@@ -180,9 +180,8 @@ class _EcranProfilState extends State<EcranProfil> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            Text('API : ${ClientApi.urlBase}',
-                style: typo.labelSmall, textAlign: TextAlign.center),
+            const SizedBox(height: 32),
+            const _CreditTmdb(),
           ],
         ),
       ),
@@ -218,6 +217,29 @@ class _EcranProfilState extends State<EcranProfil> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Crédit TMDB — attribution obligatoire de l'API TMDB (métadonnées, affiches,
+/// bandes-annonces). L'app n'est ni approuvée ni certifiée par TMDB.
+class _CreditTmdb extends StatelessWidget {
+  const _CreditTmdb();
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return Column(
+      children: [
+        Text('Métadonnées, affiches et bandes-annonces fournies par TMDB',
+            style: typo.labelSmall, textAlign: TextAlign.center),
+        const SizedBox(height: 4),
+        Text(
+          'This product uses the TMDB API but is not endorsed or certified by TMDB.',
+          style: typo.labelSmall?.copyWith(color: CouleursSW.texteSecondaire),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }
