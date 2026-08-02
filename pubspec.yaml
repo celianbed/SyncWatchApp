@@ -28,7 +28,10 @@ dependencies:
   # Connexion Google
   google_sign_in: ^6.2.2
   # Lecteur YouTube inline (feed de bandes-annonces « Extraits »)
-  youtube_player_iframe: ^5.2.0
+  # Version vendorisée + patchée (player.html : meta referrer strict-origin) pour
+  # corriger l'erreur 152 en WebView. Voir vendor/youtube_player_iframe/.
+  youtube_player_iframe:
+    path: vendor/youtube_player_iframe
   # Ouvrir une bande-annonce sur YouTube quand l'intégration est bloquée
   url_launcher: ^6.3.0
 
