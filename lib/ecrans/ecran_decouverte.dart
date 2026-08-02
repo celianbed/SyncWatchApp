@@ -1,12 +1,18 @@
 // Extraits — feed vertical (façon Reels) des bandes-annonces des titres en
 // tendance. Un seul lecteur YouTube partagé : on change de vidéo au swipe
 // (loadVideoById) plutôt que d'instancier une WebView par page.
+import 'dart:async';
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../api/client_api.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
+import '../widgets/affiche_tmdb.dart';
 import 'ecran_fiche_film.dart';
 import 'ecran_fiche_serie.dart';
 
@@ -23,11 +29,24 @@ class _EcranDecouverteState extends State<EcranDecouverte>
     with WidgetsBindingObserver {
   List<ExtraitFeed> _items = [];
   YoutubePlayerController? _controleur;
+  StreamSubscription<YoutubePlayerValue>? _sousEtat;
+  int _index = 0;
   bool _muet = true;
   bool _enLecture = true;
+  bool _videoIndisponible = false; // trailer avec intégration bloquée (erreur YouTube)
   bool _chargement = false;
   String? _erreur;
   final Set<String> _ajoutes = {}; // "type:reference" déjà suivis pendant la session
+
+  // UA « navigateur complet » : la WebView envoie sinon une UA tronquée que
+  // YouTube peut flagguer (erreur 152). On se fait passer pour Safari / Chrome
+  // mobile selon la plateforme, ce qui fiabilise la lecture intégrée.
+  static final String _userAgent = Platform.isAndroid
+      ? 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 '
+          '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+      : 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
+          'AppleWebKit/605.1.15 (KHTML, like Gecko) '
+          'Version/17.0 Mobile/15E148 Safari/604.1';
 
   @override
   void initState() {
@@ -63,8 +82,17 @@ class _EcranDecouverteState extends State<EcranDecouverte>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _sousEtat?.cancel();
     _controleur?.close();
     super.dispose();
+  }
+
+  /// Suit l'état du lecteur : détecte les vidéos non intégrables (erreur YouTube).
+  void _surEtatLecteur(YoutubePlayerValue valeur) {
+    final indisponible = valeur.error != YoutubeError.none;
+    if (indisponible != _videoIndisponible && mounted) {
+      setState(() => _videoIndisponible = indisponible);
+    }
   }
 
   Future<void> _charger() async {
@@ -78,23 +106,31 @@ class _EcranDecouverteState extends State<EcranDecouverte>
         for (final e in donnees) ExtraitFeed.depuisJson(e as Map<String, dynamic>)
       ];
       if (!mounted) return;
+      _sousEtat?.cancel();
       _controleur?.close();
       final ctrl = items.isEmpty
           ? null
           : YoutubePlayerController.fromVideoId(
               videoId: items.first.cleYoutube,
               autoPlay: widget.actif,
-              params: const YoutubePlayerParams(
+              params: YoutubePlayerParams(
                 showControls: false,
                 showFullscreenButton: false,
                 mute: true, // démarrage muet = autoplay fiable ; l'utilisateur active le son
                 enableCaption: false,
                 loop: false,
+                // origin explicite : fournit un Referer valide au lecteur intégré,
+                // sinon certaines vidéos renvoient l'erreur 152/153 dans la WebView
+                origin: 'https://www.youtube.com',
+                userAgent: _userAgent,
               ),
             );
+      _sousEtat = ctrl?.stream.listen(_surEtatLecteur);
       setState(() {
         _items = items;
         _controleur = ctrl;
+        _index = 0;
+        _videoIndisponible = false;
         _enLecture = true;
         _chargement = false;
       });
@@ -108,9 +144,20 @@ class _EcranDecouverteState extends State<EcranDecouverte>
   }
 
   void _changerPage(int i) {
-    setState(() => _enLecture = true);
+    setState(() {
+      _index = i;
+      _enLecture = true;
+      _videoIndisponible = false;
+    });
     _controleur?.loadVideoById(videoId: _items[i].cleYoutube);
     if (_muet) _controleur?.mute(); // loadVideoById peut réactiver le son
+  }
+
+  Future<void> _ouvrirYoutube(String cle) async {
+    final uri = Uri.parse('https://www.youtube.com/watch?v=$cle');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) _message("Impossible d'ouvrir YouTube.");
+    }
   }
 
   void _basculerLecture() {
@@ -186,6 +233,12 @@ class _EcranDecouverteState extends State<EcranDecouverte>
             child: YoutubePlayer(controller: _controleur!, aspectRatio: 16 / 9),
           ),
         ),
+        // Vidéo non intégrable : on masque le lecteur cassé par l'affiche du titre.
+        if (_videoIndisponible)
+          Positioned.fill(
+            child:
+                IgnorePointer(child: _FondIndisponible(extrait: _items[_index])),
+          ),
         PageView.builder(
           scrollDirection: Axis.vertical,
           onPageChanged: _changerPage,
@@ -202,11 +255,19 @@ class _EcranDecouverteState extends State<EcranDecouverte>
           },
         ),
         // Icône « en pause » au centre quand la vidéo est arrêtée.
-        if (!_enLecture)
+        if (!_enLecture && !_videoIndisponible)
           const IgnorePointer(
             child: Center(
               child: Icon(Icons.play_arrow_rounded,
                   size: 88, color: Colors.white70),
+            ),
+          ),
+        // Repli quand la bande-annonce refuse l'intégration : ouvrir sur YouTube.
+        if (_videoIndisponible)
+          Align(
+            alignment: const Alignment(0, -0.2),
+            child: _RepliYoutube(
+              surOuvrir: () => _ouvrirYoutube(_items[_index].cleYoutube),
             ),
           ),
         // Bouton son en haut à droite (au-dessus du PageView → cliquable).
@@ -339,6 +400,57 @@ class _BoutonRond extends StatelessWidget {
           child: Icon(icone, color: Colors.white, size: 22),
         ),
       ),
+    );
+  }
+}
+
+/// Fond affiché à la place d'une bande-annonce non intégrable : l'affiche du
+/// titre, assombrie, pour que l'écran reste soigné plutôt que « cassé ».
+class _FondIndisponible extends StatelessWidget {
+  final ExtraitFeed extrait;
+  const _FondIndisponible({required this.extrait});
+
+  @override
+  Widget build(BuildContext context) {
+    final url =
+        urlImageTmdb(extrait.imageDeFond ?? extrait.affiche, largeur: 780);
+    if (url == null) return const ColoredBox(color: CouleursSW.fond);
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.black.withValues(alpha: 0.45),
+      colorBlendMode: BlendMode.darken,
+      errorWidget: (_, _, _) => const ColoredBox(color: CouleursSW.fond),
+    );
+  }
+}
+
+/// Bouton de repli : ouvre la bande-annonce dans l'app YouTube.
+class _RepliYoutube extends StatelessWidget {
+  final VoidCallback surOuvrir;
+  const _RepliYoutube({required this.surOuvrir});
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.videocam_off_outlined,
+            color: Colors.white70, size: 40),
+        const SizedBox(height: 10),
+        Text('Bande-annonce non lisible ici',
+            style: typo.bodySmall?.copyWith(color: Colors.white),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: surOuvrir,
+          icon: const Icon(Icons.smart_display_outlined),
+          label: const Text('Regarder sur YouTube'),
+        ),
+      ],
     );
   }
 }
