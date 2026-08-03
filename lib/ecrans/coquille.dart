@@ -1,4 +1,6 @@
-// Coquille de navigation : tab bar Accueil · Recherche · Calendrier · Stats · Profil.
+// Coquille de navigation : Accueil · Extraits · Recherche · Calendrier · Stats · Profil.
+// 6 onglets → on n'affiche que le label sélectionné (sinon les labels de longueurs
+// différentes rendent la barre visuellement mal répartie sur écran étroit).
 import 'package:flutter/material.dart';
 
 import 'ecran_accueil.dart';
@@ -35,6 +37,7 @@ class _CoquilleState extends State<Coquille> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         destinations: const [
           NavigationDestination(
               icon: Icon(Icons.home_outlined),

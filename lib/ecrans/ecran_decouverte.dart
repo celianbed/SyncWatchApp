@@ -36,6 +36,8 @@ class _EcranDecouverteState extends State<EcranDecouverte>
   bool _videoIndisponible = false; // trailer avec intégration bloquée (erreur YouTube)
   bool _chargement = false;
   String? _erreur;
+  int _pageChargee = 0; // dernière page de tendances chargée (feed infini)
+  bool _chargeSuivant = false; // garde-fou : un seul préchargement à la fois
   final Set<String> _ajoutes = {}; // "type:reference" déjà suivis pendant la session
 
   @override
@@ -109,10 +111,7 @@ class _EcranDecouverteState extends State<EcranDecouverte>
       _erreur = null;
     });
     try {
-      final donnees = await api.get('/decouverte/extraits') as List;
-      final items = [
-        for (final e in donnees) ExtraitFeed.depuisJson(e as Map<String, dynamic>)
-      ];
+      final items = await _chargerPage(1);
       if (!mounted) return;
       _sousEtat?.cancel();
       _controleur?.close();
@@ -138,6 +137,7 @@ class _EcranDecouverteState extends State<EcranDecouverte>
         _items = items;
         _controleur = ctrl;
         _index = 0;
+        _pageChargee = 1;
         _demarrageForce = false;
         _videoIndisponible = false;
         _enLecture = true;
@@ -152,6 +152,40 @@ class _EcranDecouverteState extends State<EcranDecouverte>
     }
   }
 
+  /// Récupère une page du feed (bandes-annonces des tendances).
+  Future<List<ExtraitFeed>> _chargerPage(int page) async {
+    final donnees =
+        await api.get('/decouverte/extraits', params: {'page': '$page'}) as List;
+    return [
+      for (final e in donnees) ExtraitFeed.depuisJson(e as Map<String, dynamic>)
+    ];
+  }
+
+  /// Précharge la page suivante et l'ajoute au feed (scroll infini). Quand les
+  /// tendances sont épuisées, reboucle à la page 1 → jamais de fin.
+  Future<void> _chargerSuivant() async {
+    if (_chargeSuivant) return;
+    _chargeSuivant = true;
+    try {
+      var page = _pageChargee + 1;
+      var nouveaux = await _chargerPage(page);
+      if (nouveaux.isEmpty) {
+        page = 1; // fin des tendances → on reboucle
+        nouveaux = await _chargerPage(1);
+      }
+      if (mounted && nouveaux.isNotEmpty) {
+        setState(() {
+          _items = [..._items, ...nouveaux];
+          _pageChargee = page;
+        });
+      }
+    } on ExceptionApi {
+      // silencieux : on retentera au prochain swipe
+    } finally {
+      _chargeSuivant = false;
+    }
+  }
+
   void _changerPage(int i) {
     setState(() {
       _index = i;
@@ -160,6 +194,8 @@ class _EcranDecouverteState extends State<EcranDecouverte>
     _demarrageForce = false; // nouvelle vidéo → un nouveau coup de pouce autorisé
     _controleur?.loadVideoById(videoId: _items[i].cleYoutube);
     if (_muet) _controleur?.mute(); // loadVideoById peut réactiver le son
+    // feed infini : précharge la suite quand on approche de la fin
+    if (i >= _items.length - 3) _chargerSuivant();
   }
 
   Future<void> _ouvrirYoutube(String cle) async {
@@ -167,11 +203,6 @@ class _EcranDecouverteState extends State<EcranDecouverte>
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) _message("Impossible d'ouvrir YouTube.");
     }
-  }
-
-  void _basculerLecture() {
-    // agit sur l'état RÉEL ; l'UI se met à jour via _surEtatLecteur (le stream)
-    _enLecture ? _controleur?.pauseVideo() : _controleur?.playVideo();
   }
 
   void _basculerSon() {
@@ -257,20 +288,12 @@ class _EcranDecouverteState extends State<EcranDecouverte>
             return _PageInfos(
               extrait: e,
               deja: _ajoutes.contains('${e.type}:${e.referenceTmdb}'),
-              surTap: _basculerLecture,
+              surTap: _basculerSon, // tap = couper/remettre le son (la vidéo reste en lecture)
               surSuivre: () => _suivre(e),
               surDetail: () => _ouvrirFiche(e),
             );
           },
         ),
-        // Icône « en pause » au centre quand la vidéo est arrêtée.
-        if (!_enLecture && !_videoIndisponible)
-          const IgnorePointer(
-            child: Center(
-              child: Icon(Icons.play_arrow_rounded,
-                  size: 88, color: Colors.white70),
-            ),
-          ),
         // Repli quand la bande-annonce refuse l'intégration : ouvrir sur YouTube.
         if (_videoIndisponible)
           Align(

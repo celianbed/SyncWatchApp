@@ -66,8 +66,16 @@
               if (ytFrame) {
                 ytFrame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
               }
-              handleFullScreenForMobilePlatform();
+              // PATCH SyncWatch : envoyer Ready AVANT le fullscreen. La page est
+              // servie depuis 127.0.0.1, donc l'iframe youtube.com est CROSS-ORIGIN :
+              // handleFullScreenForMobilePlatform() (qui lit iframe.contentWindow.document)
+              // lève une SecurityError. Sans ce réordonnancement + try/catch, l'erreur
+              // avortait onReady et le message Ready n'était jamais envoyé.
               sendMessage('Ready', event);
+              try { handleFullScreenForMobilePlatform(); } catch (e) {}
+              // PATCH SyncWatch : couper les sous-titres automatiques
+              try { event.target.unloadModule('captions'); } catch (e) {}
+              try { event.target.setOption('captions', 'track', {}); } catch (e) {}
             },
             onStateChange: function (event) {
               clearTimeout(timerId);
@@ -90,6 +98,8 @@
               sendMessage('PlaybackRateChange', event.data);
             },
             onApiChange: function (event) {
+              // PATCH SyncWatch : le module sous-titres se charge ici → on le coupe
+              try { event.target.setOption('captions', 'track', {}); } catch (e) {}
               sendMessage('ApiChange', event.data);
             },
             onError: function (event) {
