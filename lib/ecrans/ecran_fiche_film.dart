@@ -7,6 +7,7 @@ import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/format.dart';
 import '../widgets/affiche_tmdb.dart';
+import '../widgets/avis_abonnements.dart';
 import '../widgets/fiche_extras.dart';
 import 'ecran_liste_resultats.dart';
 
@@ -182,6 +183,7 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
                 Text(film.synopsis!,
                     style: typo.bodySmall?.copyWith(height: 1.5)),
               ],
+              AvisAbonnements(cle: 'id_film', id: film.idFilm),
               SectionOuRegarder(plateformes: _plateformes),
               SectionSimilaires(
                   resultats: _similaires,

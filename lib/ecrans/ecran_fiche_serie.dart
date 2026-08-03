@@ -7,6 +7,7 @@ import '../api/client_api.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
+import '../widgets/avis_abonnements.dart';
 import '../widgets/fiche_extras.dart';
 import 'ecran_liste_resultats.dart';
 
@@ -269,6 +270,7 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
                   Text(serie.synopsis!,
                       style: typo.bodySmall?.copyWith(height: 1.5)),
                 ],
+                AvisAbonnements(cle: 'id_serie', id: serie.idSerie),
                 SectionOuRegarder(plateformes: _plateformes),
                 SectionSimilaires(
                     resultats: _similaires, surOuvrir: _ouvrirResultat),

@@ -9,6 +9,7 @@ import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
 import '../widgets/rangee_resultats.dart';
+import 'ecran_activite.dart';
 import 'ecran_fiche_serie.dart';
 import 'ecran_liste_resultats.dart';
 import 'ecran_notifications.dart';
@@ -126,6 +127,14 @@ class _EcranAccueilState extends State<EcranAccueil> {
                   children: [
                     Text(_salutation(), style: typo.bodySmall),
                     const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.dynamic_feed_outlined,
+                          color: CouleursSW.texteSecondaire),
+                      tooltip: 'Activité de tes abonnements',
+                      onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const EcranActivite())),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.notifications_outlined,
                           color: CouleursSW.texteSecondaire),

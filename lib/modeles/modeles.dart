@@ -84,6 +84,56 @@ class AvisProfil {
         dateCreation = DateTime.parse(json['date_creation'] as String);
 }
 
+/// Un évènement du fil d'activité (une action d'une personne suivie).
+class EvenementActivite {
+  final String type; // "avis" | "film_vu" | "serie_suivie"
+  final DateTime date;
+  final int idActeur;
+  final String pseudo;
+  final String? avatar;
+  final String titre;
+  final String typeCible; // "serie" | "film"
+  final int? referenceTmdb;
+  final int? note;
+
+  EvenementActivite.depuisJson(Map<String, dynamic> json)
+      : type = json['type'] as String,
+        date = DateTime.parse(json['date'] as String),
+        idActeur = (json['acteur'] as Map)['id_utilisateur'] as int,
+        pseudo = (json['acteur'] as Map)['pseudo'] as String,
+        avatar = (json['acteur'] as Map)['avatar'] as String?,
+        titre = json['titre'] as String,
+        typeCible = json['type_cible'] as String,
+        referenceTmdb = json['reference_tmdb'] as int?,
+        note = json['note'] as int?;
+
+  /// Verbe de l'action pour la phrase « pseudo [action] titre ».
+  String get action => switch (type) {
+        'avis' => note != null ? 'a noté' : 'a donné son avis sur',
+        'film_vu' => 'a vu',
+        'serie_suivie' => 'suit maintenant',
+        _ => '',
+      };
+}
+
+/// Un avis d'une personne suivie, affiché sur la fiche d'un titre.
+class AvisAmi {
+  final int idAvis;
+  final int idAuteur;
+  final String pseudo;
+  final String? avatar;
+  final int? note;
+  final String? commentaire;
+
+  AvisAmi.depuisJson(Map<String, dynamic> json)
+      : idAvis = json['id_avis'] as int,
+        idAuteur = (json['utilisateur'] as Map)['id_utilisateur'] as int,
+        pseudo = (json['utilisateur'] as Map)['pseudo'] as String,
+        avatar = (json['utilisateur'] as Map)['avatar'] as String?,
+        note = json['note'] as int?,
+        commentaire = json['commentaire'] as String?;
+}
+
 class Genre {
   final String libelle;
   Genre.depuisJson(Map<String, dynamic> json)
