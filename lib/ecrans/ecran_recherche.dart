@@ -1,5 +1,4 @@
-// Recherche TMDB — onglets Séries | Films, grille d'affiches 3 colonnes 2:3.
-// Wireframe W2 · Recherche.
+// Recherche — deux modes : Titres (séries/films TMDB) et Utilisateurs (amis).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -8,8 +7,10 @@ import '../api/client_api.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
+import '../widgets/rangee_utilisateur.dart';
 import 'ecran_fiche_film.dart';
 import 'ecran_fiche_serie.dart';
+import 'ecran_profil_public.dart';
 
 class EcranRecherche extends StatefulWidget {
   const EcranRecherche({super.key});
@@ -21,8 +22,10 @@ class EcranRecherche extends StatefulWidget {
 class _EcranRechercheState extends State<EcranRecherche> {
   final _champ = TextEditingController();
   Timer? _antiRebond;
-  String _onglet = 'serie';
-  List<ResultatRecherche>? _resultats; // null = pas encore de recherche
+  String _mode = 'titres'; // 'titres' | 'utilisateurs'
+  String _onglet = 'serie'; // sous-onglet des titres
+  List<ResultatRecherche>? _resultats; // null = pas de recherche titres
+  List<ResumeUtilisateur>? _users; // null = pas de recherche users
   bool _chargement = false;
 
   @override
@@ -37,39 +40,59 @@ class _EcranRechercheState extends State<EcranRecherche> {
     _antiRebond = Timer(const Duration(milliseconds: 400), () => _chercher(q));
   }
 
+  void _changerMode(String mode) {
+    if (mode == _mode) return;
+    setState(() {
+      _mode = mode;
+      _resultats = null;
+      _users = null;
+    });
+    _chercher(_champ.text);
+  }
+
   Future<void> _chercher(String q) async {
     final requete = q.trim();
     if (requete.isEmpty) {
       setState(() {
         _resultats = null;
+        _users = null;
         _chargement = false;
       });
       return;
     }
     setState(() => _chargement = true);
     try {
-      final donnees = await api.get('/search', params: {'q': requete}) as List;
-      if (!mounted || _champ.text.trim() != requete) return; // réponse périmée
-      setState(() {
-        _resultats = [
-          for (final r in donnees)
-            ResultatRecherche.depuisJson(r as Map<String, dynamic>)
-        ];
-        _chargement = false;
-      });
+      if (_mode == 'utilisateurs') {
+        final d = await api.get('/search/utilisateurs', params: {'q': requete}) as List;
+        if (!mounted || _champ.text.trim() != requete) return;
+        setState(() {
+          _users = [
+            for (final u in d) ResumeUtilisateur.depuisJson(u as Map<String, dynamic>)
+          ];
+          _chargement = false;
+        });
+      } else {
+        final d = await api.get('/search', params: {'q': requete}) as List;
+        if (!mounted || _champ.text.trim() != requete) return;
+        setState(() {
+          _resultats = [
+            for (final r in d) ResultatRecherche.depuisJson(r as Map<String, dynamic>)
+          ];
+          _chargement = false;
+        });
+      }
     } on ExceptionApi catch (e) {
       if (!mounted) return;
       setState(() => _chargement = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final typo = Theme.of(context).textTheme;
-    final filtres =
-        _resultats?.where((r) => r.type == _onglet).toList() ?? [];
+    final users = _mode == 'utilisateurs';
+    final filtres = _resultats?.where((r) => r.type == _onglet).toList() ?? [];
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
@@ -78,39 +101,82 @@ class _EcranRechercheState extends State<EcranRecherche> {
           children: [
             Text('Recherche', style: typo.headlineMedium),
             const SizedBox(height: 16),
+            Row(
+              children: [
+                _Onglet(
+                    libelle: 'Titres',
+                    actif: !users,
+                    surTape: () => _changerMode('titres')),
+                const SizedBox(width: 8),
+                _Onglet(
+                    libelle: 'Utilisateurs',
+                    actif: users,
+                    surTape: () => _changerMode('utilisateurs')),
+              ],
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _champ,
               onChanged: _surSaisie,
               textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                hintText: 'Série ou film…',
-                prefixIcon: Icon(Icons.search,
+              decoration: InputDecoration(
+                hintText: users ? 'Rechercher un pseudo…' : 'Série ou film…',
+                prefixIcon: const Icon(Icons.search,
                     color: CouleursSW.texteSecondaire, size: 20),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _Onglet(
-                    libelle: 'Séries',
-                    actif: _onglet == 'serie',
-                    surTape: () => setState(() => _onglet = 'serie')),
-                const SizedBox(width: 8),
-                _Onglet(
-                    libelle: 'Films',
-                    actif: _onglet == 'film',
-                    surTape: () => setState(() => _onglet = 'film')),
-              ],
-            ),
+            if (!users) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _Onglet(
+                      libelle: 'Séries',
+                      actif: _onglet == 'serie',
+                      surTape: () => setState(() => _onglet = 'serie')),
+                  const SizedBox(width: 8),
+                  _Onglet(
+                      libelle: 'Films',
+                      actif: _onglet == 'film',
+                      surTape: () => setState(() => _onglet = 'film')),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
-            Expanded(child: _corps(filtres)),
+            Expanded(child: users ? _corpsUsers() : _corpsTitres(filtres)),
           ],
         ),
       ),
     );
   }
 
-  Widget _corps(List<ResultatRecherche> filtres) {
+  Widget _corpsUsers() {
+    if (_chargement) return const Center(child: CircularProgressIndicator());
+    if (_users == null) {
+      return const _Indication(
+          icone: Icons.group_outlined,
+          texte: 'Cherche un ami par son pseudo\npour voir son profil et le suivre.');
+    }
+    if (_users!.isEmpty) {
+      return const _Indication(
+          icone: Icons.person_off_outlined, texte: 'Aucun utilisateur trouvé.');
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 24),
+      itemCount: _users!.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (_, i) {
+        final u = _users![i];
+        return RangeeUtilisateur(
+          utilisateur: u,
+          sousTitre: '${u.nbSeries} séries · ${u.nbFilms} films',
+          surOuvrir: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => EcranProfilPublic(idUtilisateur: u.idUtilisateur))),
+        );
+      },
+    );
+  }
+
+  Widget _corpsTitres(List<ResultatRecherche> filtres) {
     if (_chargement) return const Center(child: CircularProgressIndicator());
     if (_resultats == null) {
       return const _Indication(
@@ -118,8 +184,7 @@ class _EcranRechercheState extends State<EcranRecherche> {
           texte: 'Cherche une série ou un film\npour commencer à suivre.');
     }
     if (filtres.isEmpty) {
-      return const _Indication(
-          icone: Icons.search_off, texte: 'Aucun résultat.');
+      return const _Indication(icone: Icons.search_off, texte: 'Aucun résultat.');
     }
     return GridView.builder(
       padding: const EdgeInsets.only(bottom: 24),
@@ -127,7 +192,7 @@ class _EcranRechercheState extends State<EcranRecherche> {
         crossAxisCount: 3,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 2 / 3, // affiches 2:3, cf. charte
+        childAspectRatio: 2 / 3,
       ),
       itemCount: filtres.length,
       itemBuilder: (context, i) {
@@ -137,8 +202,7 @@ class _EcranRechercheState extends State<EcranRecherche> {
             final page = resultat.type == 'serie'
                 ? EcranFicheSerie(referenceTmdb: resultat.referenceTmdb)
                 : EcranFicheFilm(referenceTmdb: resultat.referenceTmdb);
-            Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => page));
+            Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
           },
           child: LayoutBuilder(
             builder: (_, contraintes) => AfficheTmdb(

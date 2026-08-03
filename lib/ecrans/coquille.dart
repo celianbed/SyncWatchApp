@@ -31,7 +31,7 @@ class _CoquilleState extends State<Coquille> {
           const EcranRecherche(),
           const EcranCalendrier(),
           const EcranStats(),
-          const EcranProfil(),
+          EcranProfil(onOuvrirRecherche: () => setState(() => _index = 2)),
         ],
       ),
       bottomNavigationBar: NavigationBar(

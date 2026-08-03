@@ -9,6 +9,7 @@ import '../api/session.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/rangee_resultats.dart';
+import 'ecran_communaute.dart';
 import 'ecran_liste_resultats.dart';
 import 'ecran_notifications.dart';
 
@@ -18,7 +19,9 @@ const _moisPleins = [
 ];
 
 class EcranProfil extends StatefulWidget {
-  const EcranProfil({super.key});
+  /// Rappel pour basculer vers l'onglet Recherche (« Trouver des amis »).
+  final VoidCallback? onOuvrirRecherche;
+  const EcranProfil({super.key, this.onOuvrirRecherche});
 
   @override
   State<EcranProfil> createState() => _EcranProfilState();
@@ -167,6 +170,30 @@ class _EcranProfilState extends State<EcranProfil> {
                         setState(() => _nonLues = _chargerNonLues());
                       }
                     },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.people_outline,
+                        color: CouleursSW.texteSecondaire, size: 22),
+                    title: Text('Ma communauté', style: typo.bodyMedium),
+                    trailing: const Icon(Icons.chevron_right,
+                        color: CouleursSW.texteSecondaire),
+                    onTap: () {
+                      final id = context.read<Session>().utilisateur?.id;
+                      if (id != null) {
+                        Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => EcranCommunaute(idUtilisateur: id)));
+                      }
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.person_search_outlined,
+                        color: CouleursSW.texteSecondaire, size: 22),
+                    title: Text('Trouver des amis', style: typo.bodyMedium),
+                    trailing: const Icon(Icons.chevron_right,
+                        color: CouleursSW.texteSecondaire),
+                    onTap: widget.onOuvrirRecherche,
                   ),
                   const Divider(height: 1),
                   ListTile(

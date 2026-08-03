@@ -17,6 +17,73 @@ class Utilisateur {
         dateInscription = DateTime.parse(json['date_inscription'] as String);
 }
 
+/// Ligne d'utilisateur (recherche, abonnés, abonnements). `estAbonne` est mutable
+/// pour les mises à jour optimistes du bouton Suivre.
+class ResumeUtilisateur {
+  final int idUtilisateur;
+  final String pseudo;
+  final String? avatar;
+  final int nbSeries;
+  final int nbFilms;
+  bool estAbonne; // je le suis
+  final bool meSuit; // il me suit
+
+  ResumeUtilisateur.depuisJson(Map<String, dynamic> json)
+      : idUtilisateur = json['id_utilisateur'] as int,
+        pseudo = json['pseudo'] as String,
+        avatar = json['avatar'] as String?,
+        nbSeries = json['nb_series'] as int,
+        nbFilms = json['nb_films'] as int,
+        estAbonne = json['est_abonne'] as bool,
+        meSuit = json['me_suit'] as bool;
+
+  bool get estAmi => estAbonne && meSuit; // suivi mutuel
+}
+
+/// Profil public détaillé d'un utilisateur. `estAbonne`/`nbAbonnes` mutables (optimiste).
+class ProfilPublic {
+  final int idUtilisateur;
+  final String pseudo;
+  final String? avatar;
+  final DateTime dateInscription;
+  int nbAbonnes;
+  final int nbAbonnements;
+  final int nbSeries;
+  bool estAbonne;
+  final bool meSuit;
+
+  ProfilPublic.depuisJson(Map<String, dynamic> json)
+      : idUtilisateur = json['id_utilisateur'] as int,
+        pseudo = json['pseudo'] as String,
+        avatar = json['avatar'] as String?,
+        dateInscription = DateTime.parse(json['date_inscription'] as String),
+        nbAbonnes = json['nb_abonnes'] as int,
+        nbAbonnements = json['nb_abonnements'] as int,
+        nbSeries = json['nb_series'] as int,
+        estAbonne = json['est_abonne'] as bool,
+        meSuit = json['me_suit'] as bool;
+
+  bool get estAmi => estAbonne && meSuit;
+}
+
+/// Un avis affiché sur un profil public : titre de la cible + note (sans commentaire).
+class AvisProfil {
+  final int idAvis;
+  final String titre;
+  final String type; // "serie" | "film" | "episode"
+  final int? referenceTmdb;
+  final int? note;
+  final DateTime dateCreation;
+
+  AvisProfil.depuisJson(Map<String, dynamic> json)
+      : idAvis = json['id_avis'] as int,
+        titre = json['titre'] as String,
+        type = json['type'] as String,
+        referenceTmdb = json['reference_tmdb'] as int?,
+        note = json['note'] as int?,
+        dateCreation = DateTime.parse(json['date_creation'] as String);
+}
+
 class Genre {
   final String libelle;
   Genre.depuisJson(Map<String, dynamic> json)
