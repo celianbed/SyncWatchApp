@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../util/format.dart';
 import 'ecran_fiche_film.dart';
 import 'ecran_fiche_serie.dart';
+import 'ecran_profil_public.dart';
 
 class EcranNotifications extends StatefulWidget {
   const EcranNotifications({super.key});
@@ -49,15 +50,23 @@ class _EcranNotificationsState extends State<EcranNotifications> {
     }
   }
 
-  /// Tap : marque lu et ouvre la fiche liée (série/film) si disponible.
+  /// Tap : marque lu et ouvre la fiche liée (série/film), sinon le profil de
+  /// l'acteur pour une notif sociale (abonnement).
   void _ouvrir(NotificationPublique notification) {
     _marquerLue(notification); // en arrière-plan (optimiste)
     final ref = notification.referenceTmdb;
-    if (ref == null) return;
-    Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => notification.cible == 'film'
-            ? EcranFicheFilm(referenceTmdb: ref)
-            : EcranFicheSerie(referenceTmdb: ref)));
+    if (ref != null) {
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => notification.cible == 'film'
+              ? EcranFicheFilm(referenceTmdb: ref)
+              : EcranFicheSerie(referenceTmdb: ref)));
+      return;
+    }
+    final acteur = notification.idActeur;
+    if (acteur != null) {
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => EcranProfilPublic(idUtilisateur: acteur)));
+    }
   }
 
   Future<void> _toutMarquerLu() async {

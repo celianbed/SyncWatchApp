@@ -453,6 +453,7 @@ class NotificationPublique {
   bool lue;
   final int? idSerie;
   final int? idFilm;
+  final int? idActeur; // notif sociale : profil à ouvrir au tap
   // cible de navigation (fiche à ouvrir au tap), résolue par l'API
   final int? referenceTmdb;
   final String? cible; // "serie" | "film"
@@ -465,6 +466,7 @@ class NotificationPublique {
         lue = json['lue'] as bool,
         idSerie = json['id_serie'] as int?,
         idFilm = json['id_film'] as int?,
+        idActeur = json['id_acteur'] as int?,
         referenceTmdb = json['reference_tmdb'] as int?,
         cible = json['cible'] as String?;
 }
