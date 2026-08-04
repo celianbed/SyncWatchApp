@@ -66,6 +66,25 @@ class ProfilPublic {
   bool get estAmi => estAbonne && meSuit;
 }
 
+/// Compatibilité de goûts avec un autre utilisateur.
+class Compatibilite {
+  final int pourcentage;
+  final int titresCommuns;
+  final String base; // "notes" | "titres" | "aucune"
+
+  Compatibilite.depuisJson(Map<String, dynamic> json)
+      : pourcentage = json['pourcentage'] as int,
+        titresCommuns = json['titres_communs'] as int,
+        base = json['base'] as String;
+
+  bool get pertinent => base != 'aucune';
+
+  String get detail {
+    final t = '$titresCommuns titre${titresCommuns > 1 ? 's' : ''} en commun';
+    return base == 'notes' ? 'vos notes concordent · $t' : t;
+  }
+}
+
 /// Un avis affiché sur un profil public : titre de la cible + note (sans commentaire).
 class AvisProfil {
   final int idAvis;

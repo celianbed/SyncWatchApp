@@ -30,6 +30,7 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
   late Future<ProfilPublic> _profil = _chargerProfil();
   late final Future<List<ResultatRecherche>> _series = _chargerSeries();
   late final Future<List<AvisProfil>> _avis = _chargerAvis();
+  late final Future<Compatibilite> _compat = _chargerCompat();
   ProfilPublic? _p;
   bool _enCours = false;
 
@@ -49,6 +50,10 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
     final d = await api.get('/utilisateurs/${widget.idUtilisateur}/avis') as List;
     return [for (final a in d) AvisProfil.depuisJson(a as Map<String, dynamic>)];
   }
+
+  Future<Compatibilite> _chargerCompat() async => Compatibilite.depuisJson(
+      await api.get('/utilisateurs/${widget.idUtilisateur}/compatibilite')
+          as Map<String, dynamic>);
 
   Future<void> _basculerAbonnement(ProfilPublic p) async {
     final avant = p.estAbonne;
@@ -125,6 +130,17 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
         Center(
           child: Text('Membre depuis ${_moisPleins[p.dateInscription.month - 1]} '
               '${p.dateInscription.year}', style: typo.bodySmall),
+        ),
+        FutureBuilder<Compatibilite>(
+          future: _compat,
+          builder: (_, snap) {
+            final c = snap.data;
+            if (c == null || !c.pertinent) return const SizedBox(height: 18);
+            return Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Center(child: _ChipCompatibilite(compat: c)),
+            );
+          },
         ),
         const SizedBox(height: 18),
         _BoutonSuivrePlein(
@@ -210,6 +226,33 @@ class _BoutonSuivrePlein extends StatelessWidget {
     return abonne
         ? OutlinedButton(onPressed: surPresse, child: enfant)
         : FilledButton(onPressed: surPresse, child: enfant);
+  }
+}
+
+class _ChipCompatibilite extends StatelessWidget {
+  final Compatibilite compat;
+  const _ChipCompatibilite({required this.compat});
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: CouleursSW.accent.withValues(alpha: .15),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('${compat.pourcentage}% compatible',
+              style: typo.titleMedium?.copyWith(
+                  color: CouleursSW.accent, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text(compat.detail, style: typo.labelSmall),
+        ],
+      ),
+    );
   }
 }
 
