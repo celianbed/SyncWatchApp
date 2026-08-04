@@ -32,6 +32,7 @@ class _EcranProfilState extends State<EcranProfil> {
   late Future<List<ResultatRecherche>> _favoris;
   late Future<List<ResultatRecherche>> _filmsVus;
   late Future<int> _nonLues;
+  Future<ProfilPublic>? _communaute; // compteurs abonnés/abonnements
 
   @override
   void initState() {
@@ -44,7 +45,13 @@ class _EcranProfilState extends State<EcranProfil> {
     _favoris = _chargerListe('/utilisateurs/moi/favoris');
     _filmsVus = _chargerListe('/utilisateurs/moi/films-vus');
     _nonLues = _chargerNonLues();
+    final id = context.read<Session>().utilisateur?.id;
+    if (id != null) _communaute = _chargerCommunaute(id);
   }
+
+  Future<ProfilPublic> _chargerCommunaute(int id) async =>
+      ProfilPublic.depuisJson(
+          await api.get('/utilisateurs/$id') as Map<String, dynamic>);
 
   Future<StatsGlobales> _chargerStats() async =>
       StatsGlobales.depuisJson(await api.get('/stats') as Map<String, dynamic>);
@@ -93,6 +100,13 @@ class _EcranProfilState extends State<EcranProfil> {
                 'Membre depuis ${_moisPleins[utilisateur.dateInscription.month - 1]} ${utilisateur.dateInscription.year}',
                 style: typo.bodySmall,
                 textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              _CarteCommunaute(
+                communaute: _communaute,
+                surOuvrir: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) =>
+                        EcranCommunaute(idUtilisateur: utilisateur.id))),
               ),
             ],
             const SizedBox(height: 28),
@@ -168,21 +182,6 @@ class _EcranProfilState extends State<EcranProfil> {
                       // au retour, le nombre de non lues a pu changer
                       if (mounted) {
                         setState(() => _nonLues = _chargerNonLues());
-                      }
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.people_outline,
-                        color: CouleursSW.texteSecondaire, size: 22),
-                    title: Text('Ma communauté', style: typo.bodyMedium),
-                    trailing: const Icon(Icons.chevron_right,
-                        color: CouleursSW.texteSecondaire),
-                    onTap: () {
-                      final id = context.read<Session>().utilisateur?.id;
-                      if (id != null) {
-                        Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => EcranCommunaute(idUtilisateur: id)));
                       }
                     },
                   ),
@@ -267,6 +266,39 @@ class _CreditTmdb extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+}
+
+/// Carte « Ma communauté » (haut du profil) : accès aux abonnés/abonnements
+/// avec les compteurs en sous-titre.
+class _CarteCommunaute extends StatelessWidget {
+  final Future<ProfilPublic>? communaute;
+  final VoidCallback surOuvrir;
+  const _CarteCommunaute({required this.communaute, required this.surOuvrir});
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = Theme.of(context).textTheme;
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.people_outline,
+            color: CouleursSW.accent, size: 24),
+        title: Text('Ma communauté', style: typo.bodyMedium),
+        subtitle: FutureBuilder<ProfilPublic>(
+          future: communaute,
+          builder: (_, snap) {
+            final c = snap.data;
+            if (c == null) return const SizedBox.shrink();
+            return Text(
+                '${c.nbAbonnes} abonnés · ${c.nbAbonnements} abonnements',
+                style: typo.labelSmall);
+          },
+        ),
+        trailing: const Icon(Icons.chevron_right,
+            color: CouleursSW.texteSecondaire),
+        onTap: surOuvrir,
+      ),
     );
   }
 }
