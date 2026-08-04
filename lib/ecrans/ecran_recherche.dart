@@ -23,8 +23,7 @@ class _EcranRechercheState extends State<EcranRecherche> {
   final _champ = TextEditingController();
   Timer? _antiRebond;
   String _mode = 'titres'; // 'titres' | 'utilisateurs'
-  String _onglet = 'serie'; // sous-onglet des titres
-  List<ResultatRecherche>? _resultats; // null = pas de recherche titres
+  List<ResultatRecherche>? _resultats; // null = pas de recherche titres (séries + films)
   List<ResumeUtilisateur>? _users; // null = pas de recherche users
   bool _chargement = false;
 
@@ -92,7 +91,6 @@ class _EcranRechercheState extends State<EcranRecherche> {
   Widget build(BuildContext context) {
     final typo = Theme.of(context).textTheme;
     final users = _mode == 'utilisateurs';
-    final filtres = _resultats?.where((r) => r.type == _onglet).toList() ?? [];
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
@@ -125,24 +123,9 @@ class _EcranRechercheState extends State<EcranRecherche> {
                     color: CouleursSW.texteSecondaire, size: 20),
               ),
             ),
-            if (!users) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _Onglet(
-                      libelle: 'Séries',
-                      actif: _onglet == 'serie',
-                      surTape: () => setState(() => _onglet = 'serie')),
-                  const SizedBox(width: 8),
-                  _Onglet(
-                      libelle: 'Films',
-                      actif: _onglet == 'film',
-                      surTape: () => setState(() => _onglet = 'film')),
-                ],
-              ),
-            ],
             const SizedBox(height: 16),
-            Expanded(child: users ? _corpsUsers() : _corpsTitres(filtres)),
+            Expanded(
+                child: users ? _corpsUsers() : _corpsTitres(_resultats ?? [])),
           ],
         ),
       ),
