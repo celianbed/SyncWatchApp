@@ -8,6 +8,7 @@ import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
 import '../widgets/avis_abonnements.dart';
+import '../widgets/feuille_recommander.dart';
 import '../widgets/fiche_extras.dart';
 import 'ecran_liste_resultats.dart';
 
@@ -201,7 +202,14 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
     }
     if (_erreur != null || _serie == null) {
       return Scaffold(
-        appBar: AppBar(),
+        appBar: AppBar(actions: [
+          IconButton(
+            icon: const Icon(Icons.send_outlined),
+            tooltip: 'Recommander à un ami',
+            onPressed: () => ouvrirRecommander(context,
+                referenceTmdb: widget.referenceTmdb, type: 'serie'),
+          ),
+        ]),
         body: Center(
             child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -226,7 +234,20 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(serie.titre, style: typo.headlineMedium),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                        child: Text(serie.titre, style: typo.headlineMedium)),
+                    IconButton(
+                      icon: const Icon(Icons.send_outlined,
+                          color: CouleursSW.texteSecondaire),
+                      tooltip: 'Recommander à un ami',
+                      onPressed: () => ouvrirRecommander(context,
+                          referenceTmdb: widget.referenceTmdb, type: 'serie'),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 ChipsGenres(genres: serie.genres),
                 const SizedBox(height: 10),

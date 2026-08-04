@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../util/format.dart';
 import '../widgets/affiche_tmdb.dart';
 import '../widgets/avis_abonnements.dart';
+import '../widgets/feuille_recommander.dart';
 import '../widgets/fiche_extras.dart';
 import 'ecran_liste_resultats.dart';
 
@@ -110,7 +111,14 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
   Widget build(BuildContext context) {
     final typo = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(actions: [
+        IconButton(
+          icon: const Icon(Icons.send_outlined),
+          tooltip: 'Recommander à un ami',
+          onPressed: () => ouvrirRecommander(context,
+              referenceTmdb: widget.referenceTmdb, type: 'film'),
+        ),
+      ]),
       body: FutureBuilder(
         future: _film,
         builder: (context, instantane) {
