@@ -66,6 +66,28 @@ class ProfilPublic {
   bool get estAmi => estAbonne && meSuit;
 }
 
+/// Où en est une personne suivie sur une série commune.
+class ProgressionAmi {
+  final int idUtilisateur;
+  final String pseudo;
+  final String? avatar;
+  final int episodesVus;
+  final int totalEpisodes;
+  final String? prochainCode; // null = série terminée
+
+  ProgressionAmi.depuisJson(Map<String, dynamic> json)
+      : idUtilisateur = json['id_utilisateur'] as int,
+        pseudo = json['pseudo'] as String,
+        avatar = json['avatar'] as String?,
+        episodesVus = json['episodes_vus'] as int,
+        totalEpisodes = json['total_episodes'] as int,
+        prochainCode = json['prochain_code'] as String?;
+
+  double get fraction => totalEpisodes == 0 ? 0 : episodesVus / totalEpisodes;
+  String get position =>
+      prochainCode == null ? 'A terminé la série' : 'En est à $prochainCode';
+}
+
 /// Compatibilité de goûts avec un autre utilisateur.
 class Compatibilite {
   final int pourcentage;
