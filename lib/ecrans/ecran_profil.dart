@@ -57,9 +57,9 @@ class _EcranProfilState extends State<EcranProfil> {
       StatsGlobales.depuisJson(await api.get('/stats') as Map<String, dynamic>);
 
   Future<int> _chargerNonLues() async {
-    final donnees =
-        await api.get('/notifications', params: {'lue': 'false'}) as List;
-    return donnees.length;
+    // route dédiée : compter en récupérant la liste la rendrait impossible à borner
+    final donnees = await api.get('/notifications/nombre-non-lues');
+    return (donnees as Map<String, dynamic>)['nombre'] as int;
   }
 
   Future<List<ResultatRecherche>> _chargerListe(String chemin) async {
