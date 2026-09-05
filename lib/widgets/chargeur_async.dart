@@ -26,7 +26,7 @@ class ChargeurAsync<T> extends StatelessWidget {
       future: future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const _Attente();
         }
         if (snap.hasError) {
           return _Erreur(
@@ -41,6 +41,34 @@ class ChargeurAsync<T> extends StatelessWidget {
     );
   }
 }
+
+/// Spinner, qui s'accompagne d'un mot d'explication quand le serveur sort de
+/// veille : le réveil peut durer près d'une minute, et un spinner muet pendant
+/// tout ce temps se lit comme une application cassée.
+class _Attente extends StatelessWidget {
+  const _Attente();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ValueListenableBuilder<bool>(
+        valueListenable: api.reveil,
+        builder: (context, reveil, _) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            if (reveil) ...[
+              const SizedBox(height: 16),
+              Text('Réveil du serveur…',
+                  style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 
 class _Erreur extends StatelessWidget {
   final String message;

@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ExceptionApi implements Exception {
@@ -47,8 +48,20 @@ class ClientApi {
 
   final http.Client _http;
 
-  /// `client` n'est fourni que par les tests, pour doubler le réseau.
-  ClientApi({http.Client? client}) : _http = client ?? http.Client();
+  /// `client` et les délais ne sont fournis que par les tests, pour doubler le
+  /// réseau et ne pas attendre vraiment vingt secondes.
+  ClientApi({http.Client? client, Duration? delaiNormal, Duration? delaiReveil})
+      : _http = client ?? http.Client(),
+        _delaiNormal = delaiNormal ?? const Duration(seconds: 20),
+        _delaiReveil = delaiReveil ?? const Duration(seconds: 75);
+
+  /// Vrai pendant la seconde tentative d'une lecture : l'hébergement met le
+  /// service en veille et son réveil dure jusqu'à une minute. Les écrans
+  /// s'en servent pour dire « réveil du serveur » au lieu d'un spinner muet.
+  final reveil = ValueNotifier<bool>(false);
+
+  final Duration _delaiNormal;
+  final Duration _delaiReveil;
 
   Uri _uri(String chemin, [Map<String, String>? params]) {
     final uri = Uri.parse('$urlBase$chemin');
@@ -71,21 +84,51 @@ class ClientApi {
 
   /// Exécute la requête avec un timeout, transforme une panne réseau en
   /// ExceptionApi(0) lisible, puis décode la réponse.
-  Future<dynamic> _envoyer(Future<http.Response> Function() requete) async {
-    final http.Response reponse;
+  ///
+  /// `rejouable` n'est vrai que pour les lectures : un délai dépassé ne dit pas
+  /// que le serveur n'a rien fait, et rejouer une écriture créerait un doublon.
+  /// Pour une lecture, la seconde tentative laisse au service le temps de sortir
+  /// de veille — sans quoi rien ne répond avant que l'utilisateur n'abandonne.
+  /// Exécute la requête avec un délai, transforme une panne réseau en
+  /// ExceptionApi(0) lisible, puis décode la réponse.
+  ///
+  /// `rejouable` n'est vrai que pour les lectures : un délai dépassé ne dit pas
+  /// que le serveur n'a rien fait, et rejouer une écriture créerait un doublon.
+  /// Pour une lecture, la seconde tentative laisse au service le temps de sortir
+  /// de veille — sans quoi rien ne répond avant que l'utilisateur n'abandonne.
+  Future<dynamic> _envoyer(Future<http.Response> Function() requete,
+      {bool rejouable = false}) async {
     try {
-      reponse = await requete().timeout(const Duration(seconds: 20));
+      return _decoder(await requete().timeout(_delaiNormal));
+    } on ExceptionApi {
+      rethrow; // erreur HTTP : surtout pas confondue avec une panne réseau
     } on TimeoutException {
-      throw ExceptionApi(0, 'Le serveur met trop de temps à répondre. Réessaie.');
+      if (!rejouable) {
+        throw ExceptionApi(0, 'Le serveur met trop de temps à répondre. Réessaie.');
+      }
     } catch (_) {
       // SocketException, ClientException… = serveur injoignable / pas de réseau
       throw ExceptionApi(0, 'Pas de connexion. Vérifie ton accès à internet.');
     }
-    return _decoder(reponse); // hors du catch : ses ExceptionApi remontent telles quelles
+
+    // Le service dormait peut-être : on lui laisse le temps de se lever.
+    reveil.value = true;
+    try {
+      return _decoder(await requete().timeout(_delaiReveil));
+    } on ExceptionApi {
+      rethrow;
+    } on TimeoutException {
+      throw ExceptionApi(0, 'Le serveur ne répond pas. Réessaie dans un instant.');
+    } catch (_) {
+      throw ExceptionApi(0, 'Pas de connexion. Vérifie ton accès à internet.');
+    } finally {
+      reveil.value = false;
+    }
   }
 
   Future<dynamic> get(String chemin, {Map<String, String>? params}) =>
-      _envoyer(() => _http.get(_uri(chemin, params), headers: _entetes));
+      _envoyer(() => _http.get(_uri(chemin, params), headers: _entetes),
+          rejouable: true);
 
   Future<dynamic> post(String chemin, {Object? corps}) =>
       _envoyer(() => _http.post(_uri(chemin),
@@ -118,7 +161,6 @@ class ClientApi {
   }
 }
 
-/// Instance unique partagée par toute l'app.
 /// Client partagé par toute l'app. Réassignable pour qu'un test puisse le
 /// remplacer par un client doublé (cf. test/).
 ClientApi api = ClientApi();
