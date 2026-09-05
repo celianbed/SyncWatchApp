@@ -203,6 +203,15 @@ class _EcranProfilState extends State<EcranProfil> {
                             ?.copyWith(color: CouleursSW.danger)),
                     onTap: () => _confirmerDeconnexion(context),
                   ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.delete_forever_outlined,
+                        color: CouleursSW.danger, size: 22),
+                    title: Text('Supprimer mon compte',
+                        style: typo.bodyMedium
+                            ?.copyWith(color: CouleursSW.danger)),
+                    onTap: () => _confirmerSuppression(context),
+                  ),
                 ],
               ),
             ),
@@ -220,6 +229,44 @@ class _EcranProfilState extends State<EcranProfil> {
       isScrollControlled: true, // laisse la place au clavier
       builder: (_) => _FeuilleEditionProfil(utilisateur: utilisateur),
     );
+  }
+
+  /// Suppression définitive du compte — obligatoire dans l'app pour l'App Store,
+  /// et volontairement plus engageante qu'une simple déconnexion.
+  void _confirmerSuppression(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (contexteDialogue) => AlertDialog(
+        backgroundColor: CouleursSW.surface,
+        title: const Text('Supprimer ton compte ?'),
+        content: const Text(
+            'Ton suivi, tes épisodes vus, tes avis et tes abonnements seront '
+            'effacés définitivement. Cette action est irréversible.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(contexteDialogue).pop(),
+              child: const Text('Annuler')),
+          TextButton(
+            onPressed: () {
+              Navigator.of(contexteDialogue).pop();
+              _supprimer(context);
+            },
+            child: const Text('Supprimer',
+                style: TextStyle(color: CouleursSW.danger)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _supprimer(BuildContext context) async {
+    final messager = ScaffoldMessenger.of(context);
+    try {
+      await context.read<Session>().supprimerMonCompte();
+      // succès : main.dart revient à l'écran de connexion via le Consumer<Session>
+    } catch (e) {
+      messager.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   void _confirmerDeconnexion(BuildContext context) {
