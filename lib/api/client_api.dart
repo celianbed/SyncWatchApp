@@ -45,7 +45,10 @@ class ClientApi {
   /// Appelé sur une réponse 401 alors qu'un jeton était présent (session expirée).
   void Function()? surNonAutorise;
 
-  final _http = http.Client();
+  final http.Client _http;
+
+  /// `client` n'est fourni que par les tests, pour doubler le réseau.
+  ClientApi({http.Client? client}) : _http = client ?? http.Client();
 
   Uri _uri(String chemin, [Map<String, String>? params]) {
     final uri = Uri.parse('$urlBase$chemin');
@@ -116,4 +119,6 @@ class ClientApi {
 }
 
 /// Instance unique partagée par toute l'app.
-final api = ClientApi();
+/// Client partagé par toute l'app. Réassignable pour qu'un test puisse le
+/// remplacer par un client doublé (cf. test/).
+ClientApi api = ClientApi();

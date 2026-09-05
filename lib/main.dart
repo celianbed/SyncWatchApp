@@ -1,6 +1,9 @@
 // SyncWatch — application mobile iOS (Flutter).
 // Point d'entrée : restaure la session puis affiche connexion ou l'app.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'api/session.dart';
@@ -11,6 +14,20 @@ import 'services/push.dart';
 import 'theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Les polices sont embarquées dans assets/google_fonts/ : on interdit le
+  // téléchargement à l'exécution, pour que la typographie soit juste dès le
+  // premier lancement et sans réseau. Une variante non embarquée retombe alors
+  // sur la police système, en le signalant dans la console.
+  GoogleFonts.config.allowRuntimeFetching = false;
+
+  // L'OFL exige que la licence accompagne les polices distribuées.
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(
+        ['google_fonts'], await rootBundle.loadString('assets/google_fonts/OFL.txt'));
+  });
+
   runApp(const AppSyncWatch());
 }
 
