@@ -1,45 +1,45 @@
 {
   "project_info": {
-    "project_number": "342313200348",
-    "project_id": "coffee-spark-ai-barista-af556",
-    "storage_bucket": "coffee-spark-ai-barista-af556.firebasestorage.app"
+    "project_number": "947966302351",
+    "project_id": "syncwatch-app-flutter",
+    "storage_bucket": "syncwatch-app-flutter.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:342313200348:android:702acbc57a30fa2a3da219",
+        "mobilesdk_app_id": "1:947966302351:android:390d1d5278e621b38e78fa",
         "android_client_info": {
           "package_name": "com.syncwatch.syncwatch_mobile"
         }
       },
       "oauth_client": [
         {
-          "client_id": "342313200348-hqfpfb5ie0j6ccp87c1m9elfhb206a50.apps.googleusercontent.com",
+          "client_id": "947966302351-p6l5vqi551ivgbcd8c8qajui31dcndnh.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.syncwatch.syncwatch_mobile",
-            "certificate_hash": "698b37aa2daa02bb265ee31441f136f5c49d2aae"
+            "certificate_hash": "edfba386b821782b8c35e4e1bb59a7f52f67ffb2"
           }
         },
         {
-          "client_id": "342313200348-248mobi7fb49faq2792b57d0djlfncce.apps.googleusercontent.com",
+          "client_id": "947966302351-c36jc6ghv32qp1iec6786h4ck0kepe4m.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyDVQNWzl2CEv_zAuvJMpiwho57bq0WlhJg"
+          "current_key": "AIzaSyDfk8KGpIFxqPGYZo8klxnsOdUEFwXOqGI"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "342313200348-248mobi7fb49faq2792b57d0djlfncce.apps.googleusercontent.com",
+              "client_id": "947966302351-c36jc6ghv32qp1iec6786h4ck0kepe4m.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "342313200348-kpmsi1bepvjseopdqnmenmrgm6132t1h.apps.googleusercontent.com",
+              "client_id": "947966302351-17qn8r0rc941kpl4dtl77ue5jkjhkt7q.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
                 "bundle_id": "com.syncwatch.syncwatchMobile"

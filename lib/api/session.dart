@@ -11,13 +11,15 @@ import '../services/push.dart';
 import 'client_api.dart';
 
 // ID du client OAuth « Web » Firebase (= GOOGLE_CLIENT_ID côté API). Public (pas secret).
-const _googleServerClientId = '342313200348-248mobi7fb49faq2792b57d0djlfncce.apps.googleusercontent.com';
+const _googleServerClientId =
+    '947966302351-c36jc6ghv32qp1iec6786h4ck0kepe4m.apps.googleusercontent.com';
 
 /// ID du client OAuth « iOS » Firebase. **Vide = bouton Google masqué sur iPhone** :
 /// sans cet identifiant, google_sign_in échoue nativement dès l'ouverture du
 /// sélecteur de compte. À renseigner en même temps que le schéma d'URL, que
 /// `ios/scripts/configurer_google_signin.sh` installe dans Info.plist.
-const googleClientIdIos = '';
+const googleClientIdIos =
+    '947966302351-17qn8r0rc941kpl4dtl77ue5jkjhkt7q.apps.googleusercontent.com';
 
 final _googleSignIn = GoogleSignIn(
   // le clientId ne vaut que pour iOS ; sur Android c'est le fichier de config qui parle

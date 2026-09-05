@@ -19,9 +19,19 @@ CLIENT_ID=$($PB -c "Print :CLIENT_ID" "$SOURCE" 2>/dev/null || true)
 REVERSED=$($PB -c "Print :REVERSED_CLIENT_ID" "$SOURCE" 2>/dev/null || true)
 
 if [ -z "$CLIENT_ID" ] || [ -z "$REVERSED" ]; then
-  echo "CLIENT_ID / REVERSED_CLIENT_ID absents de $SOURCE."
-  echo "→ Le projet Firebase n'a pas de client OAuth iOS : ajoute l'app iOS dans"
-  echo "  la console Firebase, puis retélécharge GoogleService-Info.plist."
+  PROJET=$($PB -c "Print :PROJECT_ID" "$SOURCE" 2>/dev/null || echo "inconnu")
+  echo "CLIENT_ID / REVERSED_CLIENT_ID absents de $SOURCE (projet : $PROJET)."
+  echo
+  echo "Firebase ne met ces clés dans le fichier que s'il existe un client OAuth"
+  echo "iOS. Deux causes possibles, dans cet ordre de probabilité :"
+  echo
+  echo "  1. Google n'est pas activé comme fournisseur de connexion. C'est lui qui"
+  echo "     crée les clients OAuth : console Firebase › Authentication ›"
+  echo "     Sign-in method › Google › Activer."
+  echo "  2. L'app iOS n'est pas enregistrée dans ce projet Firebase."
+  echo
+  echo "Dans les deux cas, retélécharge ensuite GoogleService-Info.plist : le"
+  echo "fichier n'est pas mis à jour tout seul."
   exit 1
 fi
 

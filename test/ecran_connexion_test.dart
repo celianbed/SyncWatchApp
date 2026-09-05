@@ -33,13 +33,14 @@ void main() {
     });
   });
 
-  testWidgets('sur iOS, Google reste masqué tant que le client iOS manque',
+  testWidgets('sur iOS, Google ne s\'affiche que si le client iOS est renseigné',
       (tester) async {
-    // googleClientIdIos est vide : afficher le bouton ferait échouer le plugin
-    // nativement au premier tap. Il doit donc rester invisible.
-    expect(googleClientIdIos, isEmpty);
+    // Sans googleClientIdIos, le plugin échoue nativement dès l'ouverture du
+    // sélecteur de compte : le bouton doit alors rester invisible. Ce test vaut
+    // dans les deux états, et c'est le couplage lui-même qu'il verrouille.
     await surPlateforme(tester, TargetPlatform.iOS, () async {
-      expect(find.text('Continuer avec Google'), findsNothing);
+      expect(find.text('Continuer avec Google'),
+          googleClientIdIos.isEmpty ? findsNothing : findsOneWidget);
     });
   });
 

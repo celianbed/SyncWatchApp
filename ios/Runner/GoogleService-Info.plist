@@ -2,18 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>947966302351-17qn8r0rc941kpl4dtl77ue5jkjhkt7q.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.947966302351-17qn8r0rc941kpl4dtl77ue5jkjhkt7q</string>
 	<key>API_KEY</key>
-	<string>AIzaSyCb-WmZL-dpS7IKTjAR6KoSvUSJ9hegLsY</string>
+	<string>AIzaSyCO89xMbs8f9vVWNNz2g-2fE1bpidX34V0</string>
 	<key>GCM_SENDER_ID</key>
-	<string>342313200348</string>
+	<string>947966302351</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.syncwatch.syncwatchMobile</string>
 	<key>PROJECT_ID</key>
-	<string>coffee-spark-ai-barista-af556</string>
+	<string>syncwatch-app-flutter</string>
 	<key>STORAGE_BUCKET</key>
-	<string>coffee-spark-ai-barista-af556.firebasestorage.app</string>
+	<string>syncwatch-app-flutter.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:342313200348:ios:c74bc90cb64159a53da219</string>
+	<string>1:947966302351:ios:a969535471ee2d5a8e78fa</string>
 </dict>
 </plist>
