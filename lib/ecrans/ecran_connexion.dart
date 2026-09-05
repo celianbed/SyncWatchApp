@@ -1,10 +1,11 @@
 // Connexion / inscription — email ou pseudo + mot de passe.
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../api/client_api.dart';
 import '../api/session.dart';
@@ -91,11 +92,24 @@ class _EcranConnexionState extends State<EcranConnexion> {
     }
   }
 
-  Future<void> _connexionGoogle() async {
+  Future<void> _connexionGoogle() =>
+      _connexionFournisseur((session) => session.connexionGoogle());
+
+  Future<void> _connexionApple() =>
+      _connexionFournisseur((session) => session.connexionApple());
+
+  Future<void> _connexionFournisseur(
+      Future<void> Function(Session) connecter) async {
     setState(() => _chargement = true);
     try {
-      await context.read<Session>().connexionGoogle();
+      await connecter(context.read<Session>());
       // succès : main.dart bascule vers la coquille via le Consumer<Session>
+    } on SignInWithAppleAuthorizationException catch (e) {
+      // annulation de la feuille Apple : ce n'est pas une erreur à afficher
+      if (e.code != AuthorizationErrorCode.canceled && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Connexion Apple impossible.')));
+      }
     } on ExceptionApi catch (e) {
       if (mounted && e.message.isNotEmpty) {
         ScaffoldMessenger.of(context)
@@ -339,9 +353,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
                                           : 'Se connecter',
                                     ),
                             ),
-                            // Bouton Google : Android uniquement — iOS n'est pas
-                            // configuré pour Google Sign-In (le plugin crashe nativement).
-                            if (Platform.isAndroid) ...[
+                            ...[
                             const SizedBox(height: 16),
                             Row(
                               children: [
@@ -361,6 +373,21 @@ class _EcranConnexionState extends State<EcranConnexion> {
                               ],
                             ),
                             const SizedBox(height: 16),
+                            // Apple avant Google : Apple demande que son bouton
+                            // ne soit pas moins visible que les autres logins.
+                            if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                              SignInWithAppleButton(
+                                onPressed:
+                                    _chargement ? () {} : _connexionApple,
+                                text: 'Continuer avec Apple',
+                                height: 48,
+                                style: SignInWithAppleButtonStyle.white,
+                                borderRadius:
+                                    const BorderRadius.all(Radius.circular(14)),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (googleDisponible)
                             OutlinedButton.icon(
                               onPressed:
                                   _chargement ? null : _connexionGoogle,

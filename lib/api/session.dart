@@ -1,7 +1,10 @@
 // Session utilisateur : jeton JWT (trousseau iOS) + profil courant.
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../modeles/modeles.dart';
 import '../services/push.dart';
@@ -10,9 +13,22 @@ import 'client_api.dart';
 // ID du client OAuth « Web » Firebase (= GOOGLE_CLIENT_ID côté API). Public (pas secret).
 const _googleServerClientId = '342313200348-248mobi7fb49faq2792b57d0djlfncce.apps.googleusercontent.com';
 
+/// ID du client OAuth « iOS » Firebase. **Vide = bouton Google masqué sur iPhone** :
+/// sans cet identifiant, google_sign_in échoue nativement dès l'ouverture du
+/// sélecteur de compte. À renseigner en même temps que le schéma d'URL, que
+/// `ios/scripts/configurer_google_signin.sh` installe dans Info.plist.
+const googleClientIdIos = '';
+
 final _googleSignIn = GoogleSignIn(
+  // le clientId ne vaut que pour iOS ; sur Android c'est le fichier de config qui parle
+  clientId: Platform.isIOS && googleClientIdIos.isNotEmpty ? googleClientIdIos : null,
   serverClientId: _googleServerClientId.isEmpty ? null : _googleServerClientId,
 );
+
+/// La connexion Google est-elle utilisable sur cette plateforme ?
+/// `defaultTargetPlatform` plutôt que `Platform` : les tests peuvent le forcer.
+bool get googleDisponible =>
+    defaultTargetPlatform == TargetPlatform.android || googleClientIdIos.isNotEmpty;
 
 class Session extends ChangeNotifier {
   static const _cleJeton = 'jeton_syncwatch';
@@ -64,6 +80,25 @@ class Session extends ChangeNotifier {
     await connecterAvecJeton(donnees['access_token'] as String);
   }
 
+  /// Connexion via Apple : la feuille système renvoie un jeton d'identité que
+  /// l'API vérifie. Prénom et adresse ne sont donnés qu'à la toute première
+  /// autorisation : on les transmet, Apple ne les redonnera jamais.
+  Future<void> connexionApple() async {
+    final identifiants = await SignInWithApple.getAppleIDCredential(scopes: [
+      AppleIDAuthorizationScopes.email,
+      AppleIDAuthorizationScopes.fullName,
+    ]);
+    final jetonIdentite = identifiants.identityToken;
+    if (jetonIdentite == null) throw ExceptionApi(0, 'Jeton Apple indisponible.');
+    final donnees = await api.post('/auth/apple', corps: {
+      'identity_token': jetonIdentite,
+      'prenom': ?identifiants.givenName,
+      // permet à l'API de révoquer l'accès Apple si le compte est supprimé
+      'code': identifiants.authorizationCode,
+    }) as Map<String, dynamic>;
+    await connecterAvecJeton(donnees['access_token'] as String);
+  }
+
   /// Finalise la session à partir d'un jeton déjà obtenu (utilisé par le sondage
   /// de vérification, qui teste la connexion sans encore entrer dans l'app).
   Future<void> connecterAvecJeton(String jeton) async {
@@ -108,11 +143,19 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> deconnexion() async {
+    await Push.oublier(); // avant d'effacer le jeton : l'appel exige d'être authentifié
     api.jeton = null;
     utilisateur = null;
     await _stockage.delete(key: _cleJeton);
     _googleSignIn.signOut(); // pour re-choisir le compte au prochain login Google
     notifyListeners();
+  }
+
+  /// Supprime définitivement le compte, puis ramène à l'écran de connexion.
+  Future<void> supprimerMonCompte() async {
+    await Push.oublier(); // tant que le compte existe : après, l'appel serait rejeté
+    await api.delete('/utilisateurs/moi');
+    await deconnexion();
   }
 
   Future<Utilisateur> _profil() async => Utilisateur.depuisJson(

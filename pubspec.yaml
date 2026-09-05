@@ -34,6 +34,7 @@ dependencies:
     path: vendor/youtube_player_iframe
   # Ouvrir une bande-annonce sur YouTube quand l'intégration est bloquée
   url_launcher: ^6.3.0
+  sign_in_with_apple: ^8.1.0
 
 dev_dependencies:
   flutter_test:
@@ -65,3 +66,10 @@ flutter_native_splash:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    # Polices embarquées : sans elles, google_fonts irait chercher Sora et Inter
+    # sur fonts.gstatic.com au premier lancement, et l'app s'afficherait en
+    # police système le temps du téléchargement. Les fichiers doivent porter le
+    # nom « Famille-Variante.ttf » — c'est ainsi que google_fonts les reconnaît.
+    - assets/google_fonts/
