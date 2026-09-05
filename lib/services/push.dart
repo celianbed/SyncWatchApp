@@ -1,4 +1,4 @@
-// Push notifications FCM — Android uniquement (iOS = APNs, compte Apple requis).
+// Push notifications — Android (FCM) et iOS (FCM relayé vers APNs).
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -13,24 +13,32 @@ import '../ecrans/ecran_fiche_serie.dart';
 final navigatorKey = GlobalKey<NavigatorState>();
 
 /// Réception en arrière-plan / app terminée (doit être top-level).
-/// Android affiche la notif système tout seul (payload « notification ») : rien à faire.
+/// Le système affiche la notif tout seul (payload « notification ») : rien à faire.
 @pragma('vm:entry-point')
 Future<void> _surMessageArrierePlan(RemoteMessage message) async {}
 
 abstract final class Push {
   static bool _fait = false;
+  static int? _idAppareil; // pour désinscrire l'appareil à la déconnexion
 
   /// À appeler une fois connecté (le POST /appareils exige le jeton). Idempotent.
   static Future<void> initialiser() async {
-    if (_fait || !Platform.isAndroid) return;
+    if (_fait) return;
     _fait = true;
     try {
       await Firebase.initializeApp();
       final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission();
-      FirebaseMessaging.onBackgroundMessage(_surMessageArrierePlan);
 
-      final jeton = await messaging.getToken();
+      final autorisation = await messaging.requestPermission();
+      if (autorisation.authorizationStatus == AuthorizationStatus.denied) {
+        return; // refus : inutile d'enregistrer un appareil qui ne recevra rien
+      }
+      FirebaseMessaging.onBackgroundMessage(_surMessageArrierePlan);
+      // sans ça, iOS n'affiche aucune notification quand l'app est au premier plan
+      await messaging.setForegroundNotificationPresentationOptions(
+          alert: true, badge: true, sound: true);
+
+      final jeton = await _jetonFcm(messaging);
       if (jeton != null) await _enregistrer(jeton);
       messaging.onTokenRefresh.listen(_enregistrer);
 
@@ -44,12 +52,47 @@ abstract final class Push {
     }
   }
 
+  /// Sur iOS, FCM ne peut rien donner tant qu'APNs ne lui a pas remis son jeton,
+  /// qui arrive un court instant après le lancement — d'où les tentatives.
+  /// Le simulateur, lui, n'en fournit jamais : on abandonne proprement.
+  static Future<String?> _jetonFcm(FirebaseMessaging messaging) async {
+    if (Platform.isIOS) {
+      var jetonApns = await messaging.getAPNSToken();
+      for (var essai = 0; jetonApns == null && essai < 5; essai++) {
+        await Future.delayed(const Duration(seconds: 1));
+        jetonApns = await messaging.getAPNSToken();
+      }
+      if (jetonApns == null) {
+        debugPrint('Push : aucun jeton APNs (simulateur, ou capability absente)');
+        return null;
+      }
+    }
+    return messaging.getToken();
+  }
+
   static Future<void> _enregistrer(String jeton) async {
     try {
-      await api.post('/appareils',
-          corps: {'jeton_notif': jeton, 'plateforme': 'android'});
+      final reponse = await api.post('/appareils', corps: {
+        'jeton_notif': jeton,
+        'plateforme': Platform.isIOS ? 'ios' : 'android',
+      }) as Map<String, dynamic>;
+      _idAppareil = reponse['id_appareil'] as int?;
     } catch (_) {
       // déjà enregistré ou API indisponible : sans gravité
+    }
+  }
+
+  /// À la déconnexion : cet appareil ne doit plus recevoir les notifs du compte
+  /// quitté. À appeler tant que le jeton d'accès est encore valide.
+  static Future<void> oublier() async {
+    final id = _idAppareil;
+    _idAppareil = null;
+    _fait = false; // la prochaine connexion réenregistrera l'appareil
+    if (id == null) return;
+    try {
+      await api.delete('/appareils/$id');
+    } catch (_) {
+      // hors ligne : le jeton sera de toute façon réattribué au prochain compte
     }
   }
 
