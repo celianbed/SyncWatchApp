@@ -40,10 +40,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  # Pilotage de l'app sur simulateur : sert à produire les captures de la fiche
-  # App Store, et à vérifier le parcours réel contre l'API de production.
-  integration_test:
-    sdk: flutter
 
   flutter_lints: ^6.0.0
   # Génération de l'icône d'app et du splash à partir de assets/logo.png
