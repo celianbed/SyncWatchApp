@@ -12,6 +12,7 @@ import '../theme.dart';
 import '../util/avatars.dart';
 import '../util/validation.dart';
 import '../widgets/rangee_resultats.dart';
+import 'ecran_blocages.dart';
 import 'ecran_communaute.dart';
 import 'ecran_liste_resultats.dart';
 import 'ecran_notifications.dart';
@@ -206,6 +207,16 @@ class _EcranProfilState extends State<EcranProfil> {
                     trailing: const Icon(Icons.chevron_right,
                         color: CouleursSW.texteSecondaire),
                     onTap: widget.onOuvrirRecherche,
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.block,
+                        color: CouleursSW.texteSecondaire, size: 22),
+                    title: Text('Personnes bloquées', style: typo.bodyMedium),
+                    trailing: const Icon(Icons.chevron_right,
+                        color: CouleursSW.texteSecondaire),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const EcranBlocages())),
                   ),
                   const Divider(height: 1),
                   ListTile(

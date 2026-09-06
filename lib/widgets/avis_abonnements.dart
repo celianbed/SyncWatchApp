@@ -7,6 +7,7 @@ import '../ecrans/ecran_profil_public.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import 'avatar_utilisateur.dart';
+import 'moderation.dart';
 
 class AvisAbonnements extends StatefulWidget {
   final String cle; // 'id_serie' | 'id_film'
@@ -64,6 +65,11 @@ class _CarteAvisAmi extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => EcranProfilPublic(idUtilisateur: avis.idAuteur))),
+        // appui long : le geste reste atteignable sans qu'une icône de
+        // signalement s'affiche sur chaque avis, ce qui donnerait le ton
+        // d'un lieu qu'il faut surveiller.
+        onLongPress: () => ouvrirSignalement(context,
+            idAvis: avis.idAvis, quoi: 'cet avis'),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(

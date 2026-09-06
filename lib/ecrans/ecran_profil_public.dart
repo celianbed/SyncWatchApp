@@ -6,6 +6,7 @@ import '../api/client_api.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/avatar_utilisateur.dart';
+import '../widgets/moderation.dart';
 import '../widgets/badge_ami.dart';
 import '../widgets/chargeur_async.dart';
 import '../widgets/rangee_resultats.dart';
@@ -105,12 +106,39 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(actions: [_menuModeration()]),
       body: ChargeurAsync<ProfilPublic>(
         future: _profil,
         surReessayer: () => setState(() => _profil = _chargerProfil()),
         enfant: _contenu,
       ),
+    );
+  }
+
+  /// Signaler et bloquer, exigés par la directive 1.2 de l'App Store. Rangés
+  /// dans un menu plutôt qu'exposés : ce sont des gestes rares, et les mettre
+  /// en avant sur chaque profil donnerait le ton d'un lieu hostile.
+  Widget _menuModeration() {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert, color: CouleursSW.texteSecondaire),
+      onSelected: (choix) async {
+        final p = _p;
+        if (p == null) return;
+        if (choix == 'signaler') {
+          await ouvrirSignalement(context,
+              idVise: p.idUtilisateur, quoi: p.pseudo);
+        } else if (await confirmerBlocage(context,
+            idUtilisateur: p.idUtilisateur, pseudo: p.pseudo)) {
+          // le profil n'existe plus pour nous : rester dessus n'aurait pas de sens
+          if (mounted) Navigator.of(context).pop();
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'signaler', child: Text('Signaler cette personne')),
+        PopupMenuItem(
+            value: 'bloquer',
+            child: Text('Bloquer', style: TextStyle(color: CouleursSW.danger))),
+      ],
     );
   }
 
