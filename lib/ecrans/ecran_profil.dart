@@ -31,6 +31,7 @@ class _EcranProfilState extends State<EcranProfil> {
   late Future<StatsGlobales> _stats;
   late Future<List<ResultatRecherche>> _favoris;
   late Future<List<ResultatRecherche>> _filmsVus;
+  late Future<List<ResultatRecherche>> _aVoir;
   late Future<int> _nonLues;
   Future<ProfilPublic>? _communaute; // compteurs abonnés/abonnements
 
@@ -44,6 +45,7 @@ class _EcranProfilState extends State<EcranProfil> {
     _stats = _chargerStats();
     _favoris = _chargerListe('/utilisateurs/moi/favoris');
     _filmsVus = _chargerListe('/utilisateurs/moi/films-vus');
+    _aVoir = _chargerListe('/utilisateurs/moi/a-voir');
     _nonLues = _chargerNonLues();
     final id = context.read<Session>().utilisateur?.id;
     if (id != null) _communaute = _chargerCommunaute(id);
@@ -72,7 +74,7 @@ class _EcranProfilState extends State<EcranProfil> {
 
   Future<void> _rafraichir() async {
     setState(_charger);
-    await Future.wait([_stats, _favoris, _filmsVus]);
+    await Future.wait([_stats, _favoris, _filmsVus, _aVoir]);
   }
 
   @override
@@ -122,6 +124,14 @@ class _EcranProfilState extends State<EcranProfil> {
             const SizedBox(height: 12),
             CarrouselResultats(
                 resultats: _favoris,
+                surOuvrir: (r) => ouvrirFiche(context, r)),
+            const SizedBox(height: 28),
+            // Les films mis de côté depuis leur fiche : sans cette section, le
+            // bouton « À voir plus tard » écrivait dans le vide.
+            _TitreSection(titre: 'À voir'),
+            const SizedBox(height: 12),
+            CarrouselResultats(
+                resultats: _aVoir,
                 surOuvrir: (r) => ouvrirFiche(context, r)),
             const SizedBox(height: 28),
             _TitreSection(titre: 'Vu récemment'),

@@ -25,6 +25,7 @@ final _reponses = <String, Object>{
   },
   '/utilisateurs/moi/favoris': [],
   '/utilisateurs/moi/films-vus': [],
+  '/utilisateurs/moi/a-voir': [],
   '/notifications/nombre-non-lues': {'nombre': 0},
   '/utilisateurs/1': {
     'id_utilisateur': 1,
