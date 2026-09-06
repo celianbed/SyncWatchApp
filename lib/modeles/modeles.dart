@@ -2,6 +2,14 @@
 
 DateTime? _date(dynamic v) => v == null ? null : DateTime.tryParse(v as String);
 
+/// Horodatage venu de l'API, ramené à l'heure de l'appareil.
+///
+/// L'API sérialise en UTC avec son décalage (`...+00:00`) : sans `toLocal()`,
+/// Dart afficherait l'heure UTC telle quelle, soit deux heures de retard en
+/// France l'été. La conversion est faite ici, une fois, plutôt que sur chaque
+/// écran — où l'oubli passait inaperçu.
+DateTime _dateHeure(dynamic v) => DateTime.parse(v as String).toLocal();
+
 class Utilisateur {
   final int id;
   final String adresseMail;
@@ -14,7 +22,7 @@ class Utilisateur {
         adresseMail = json['adresse_mail'] as String,
         pseudo = json['pseudo'] as String,
         avatar = json['avatar'] as String?,
-        dateInscription = DateTime.parse(json['date_inscription'] as String);
+        dateInscription = _dateHeure(json['date_inscription']);
 }
 
 /// Ligne d'utilisateur (recherche, abonnés, abonnements). `estAbonne` est mutable
@@ -56,7 +64,7 @@ class ProfilPublic {
       : idUtilisateur = json['id_utilisateur'] as int,
         pseudo = json['pseudo'] as String,
         avatar = json['avatar'] as String?,
-        dateInscription = DateTime.parse(json['date_inscription'] as String),
+        dateInscription = _dateHeure(json['date_inscription']),
         nbAbonnes = json['nb_abonnes'] as int,
         nbAbonnements = json['nb_abonnements'] as int,
         nbSeries = json['nb_series'] as int,
@@ -137,7 +145,7 @@ class EvenementActivite {
 
   EvenementActivite.depuisJson(Map<String, dynamic> json)
       : type = json['type'] as String,
-        date = DateTime.parse(json['date'] as String),
+        date = _dateHeure(json['date']),
         idActeur = (json['acteur'] as Map)['id_utilisateur'] as int,
         pseudo = (json['acteur'] as Map)['pseudo'] as String,
         avatar = (json['acteur'] as Map)['avatar'] as String?,
@@ -512,7 +520,7 @@ class NotificationPublique {
       : idNotification = json['id_notification'] as int,
         type = json['type'] as String,
         contenu = json['contenu'] as String,
-        dateEnvoi = DateTime.parse(json['date_envoi'] as String),
+        dateEnvoi = _dateHeure(json['date_envoi']),
         lue = json['lue'] as bool,
         idSerie = json['id_serie'] as int?,
         idFilm = json['id_film'] as int?,
