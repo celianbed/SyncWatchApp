@@ -35,9 +35,14 @@ dependencies:
   # Ouvrir une bande-annonce sur YouTube quand l'intégration est bloquée
   url_launcher: ^6.3.0
   sign_in_with_apple: ^8.1.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  # Pilotage de l'app sur simulateur : sert à produire les captures de la fiche
+  # App Store, et à vérifier le parcours réel contre l'API de production.
+  integration_test:
     sdk: flutter
 
   flutter_lints: ^6.0.0
@@ -73,3 +78,5 @@ flutter:
     # police système le temps du téléchargement. Les fichiers doivent porter le
     # nom « Famille-Variante.ttf » — c'est ainsi que google_fonts les reconnaît.
     - assets/google_fonts/
+    # Logo Google officiel, exigé par leurs conditions sur un bouton de connexion
+    - assets/marques/

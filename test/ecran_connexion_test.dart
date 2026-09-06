@@ -2,6 +2,7 @@
 // pour Google, de la présence d'un identifiant de client iOS.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -63,6 +64,38 @@ void main() {
       final apple = tester.getTopLeft(find.byType(SignInWithAppleButton)).dy;
       final google = tester.getTopLeft(find.text('Continuer avec Google')).dy;
       expect(apple, lessThan(google));
+    });
+  });
+
+  testWidgets('le bouton Google porte le logo officiel, pas une lettre',
+      (tester) async {
+    // Les conditions de Google imposent leur marque sur un bouton de connexion ;
+    // un « G » dessiné dans la police de l'app n'y répond pas.
+    await surPlateforme(tester, TargetPlatform.android, () async {
+      final bouton = find.widgetWithText(ElevatedButton, 'Continuer avec Google');
+      expect(bouton, findsOneWidget);
+      expect(find.descendant(of: bouton, matching: find.byType(SvgPicture)),
+          findsOneWidget);
+      expect(find.descendant(of: bouton, matching: find.text('G')), findsNothing);
+    });
+  });
+
+  testWidgets('les deux boutons de connexion externe forment une paire',
+      (tester) async {
+    // Même taille ET même traitement visuel : un bouton plein à côté d'un bouton
+    // à liseré paraît d'une autre taille, même à géométrie identique.
+    if (googleClientIdIos.isEmpty) {
+      markTestSkipped('Google est masqué sur iOS tant que le client manque');
+      return;
+    }
+    await surPlateforme(tester, TargetPlatform.iOS, () async {
+      final apple = find.byType(SignInWithAppleButton);
+      final google = find.widgetWithText(ElevatedButton, 'Continuer avec Google');
+      expect(tester.getSize(apple), tester.getSize(google));
+
+      final fond = tester.widget<ElevatedButton>(google).style!.backgroundColor!
+          .resolve({});
+      expect(fond, Colors.white, reason: 'le bouton Apple est plein et blanc');
     });
   });
 }

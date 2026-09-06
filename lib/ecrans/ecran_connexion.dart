@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -11,6 +12,11 @@ import '../api/client_api.dart';
 import '../api/session.dart';
 import '../theme.dart';
 import '../widgets/halo.dart';
+
+/// Hauteur commune aux boutons de connexion externe. Le bouton d'Apple dérive
+/// sa typographie et son logo de sa hauteur (× 0,43) : on en fait autant pour
+/// celui de Google, sans quoi la paire est bancale.
+const double _hauteurBoutonSocial = 48;
 
 class EcranConnexion extends StatefulWidget {
   const EcranConnexion({super.key});
@@ -380,7 +386,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
                                 onPressed:
                                     _chargement ? () {} : _connexionApple,
                                 text: 'Continuer avec Apple',
-                                height: 48,
+                                height: _hauteurBoutonSocial,
                                 style: SignInWithAppleButtonStyle.white,
                                 borderRadius:
                                     const BorderRadius.all(Radius.circular(14)),
@@ -388,25 +394,34 @@ class _EcranConnexionState extends State<EcranConnexion> {
                               const SizedBox(height: 12),
                             ],
                             if (googleDisponible)
-                            OutlinedButton.icon(
-                              onPressed:
-                                  _chargement ? null : _connexionGoogle,
-                              icon: const Text('G',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18,
-                                      color: Color(0xFF4285F4))),
-                              label: const Text('Continuer avec Google'),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
-                                foregroundColor: CouleursSW.texte,
-                                side: BorderSide(
-                                    color: Colors.white
-                                        .withValues(alpha: .18)),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14)),
+                              // Mêmes fond blanc, texte noir et métriques que le
+                              // bouton Apple juste au-dessus : côte à côte, un
+                              // bouton plein et un bouton à liseré paraissent de
+                              // tailles différentes alors qu'ils font 48 px tous
+                              // les deux. Ces valeurs sont aussi celles du bouton
+                              // clair officiel de Google.
+                              ElevatedButton.icon(
+                                onPressed:
+                                    _chargement ? null : _connexionGoogle,
+                                icon: SvgPicture.asset(
+                                    'assets/marques/google_g.svg',
+                                    width: _hauteurBoutonSocial * .43,
+                                    height: _hauteurBoutonSocial * .43),
+                                label: const Text('Continuer avec Google'),
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize:
+                                      const Size.fromHeight(_hauteurBoutonSocial),
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
+                                  elevation: 0,
+                                  textStyle: const TextStyle(
+                                      fontSize: _hauteurBoutonSocial * .43,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: -0.41),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14)),
+                                ),
                               ),
-                            ),
                             ],
                           ],
                         ),
