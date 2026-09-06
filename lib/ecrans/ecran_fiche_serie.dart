@@ -8,6 +8,7 @@ import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
 import '../widgets/avis_abonnements.dart';
+import '../widgets/bouton_bande_annonce.dart';
 import '../widgets/feuille_recommander.dart';
 import '../widgets/fiche_extras.dart';
 import '../widgets/progression_abonnements.dart';
@@ -289,6 +290,10 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
                     idSerie: serie.idSerie, noteTmdb: serie.noteMoyenneTmdb),
                 const SizedBox(height: 12),
                 _boutonSuivi(),
+                BoutonBandeAnnonce(
+                    type: 'series',
+                    referenceTmdb: widget.referenceTmdb,
+                    titre: serie.titre),
                 if (_saisons.isNotEmpty && progression.total > 0) ...[
                   const SizedBox(height: 20),
                   Text('${progression.vus} / ${progression.total} épisodes vus',

@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../util/format.dart';
 import '../widgets/affiche_tmdb.dart';
 import '../widgets/avis_abonnements.dart';
+import '../widgets/bouton_bande_annonce.dart';
 import '../widgets/feuille_recommander.dart';
 import '../widgets/fiche_extras.dart';
 import 'ecran_liste_resultats.dart';
@@ -224,6 +225,10 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
                       icon: const Icon(Icons.bookmark_add_outlined, size: 20),
                       label: const Text('À voir plus tard'),
                     ),
+              BoutonBandeAnnonce(
+                  type: 'films',
+                  referenceTmdb: widget.referenceTmdb,
+                  titre: film.titre),
               if (film.synopsis != null && film.synopsis!.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 Text(film.synopsis!,
