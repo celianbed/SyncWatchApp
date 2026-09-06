@@ -51,7 +51,7 @@ class Session extends ChangeNotifier {
       if (jeton != null) {
         api.jeton = jeton;
         utilisateur = await _profil();
-        Push.initialiser(); // enregistre l'appareil pour les notifs push (Android)
+        Push.initialiser(); // enregistre l'appareil pour les notifs push (iOS et Android)
       }
     } catch (_) {
       api.jeton = null; // jeton périmé ou API injoignable : on repart propre
@@ -107,7 +107,7 @@ class Session extends ChangeNotifier {
     api.jeton = jeton;
     await _stockage.write(key: _cleJeton, value: jeton);
     utilisateur = await _profil();
-    Push.initialiser(); // enregistre l'appareil pour les notifs push (Android)
+    Push.initialiser(); // enregistre l'appareil pour les notifs push (iOS et Android)
     notifyListeners();
   }
 

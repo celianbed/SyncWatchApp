@@ -31,15 +31,24 @@ abstract final class Push {
 
       final autorisation = await messaging.requestPermission();
       if (autorisation.authorizationStatus == AuthorizationStatus.denied) {
-        return; // refus : inutile d'enregistrer un appareil qui ne recevra rien
+        // refus : inutile d'enregistrer un appareil qui ne recevra rien.
+        // Tracé, sinon l'absence de push est indiscernable d'une panne.
+        debugPrint('Push : notifications refusées par l\'utilisateur '
+            '(Réglages > SyncWatch > Notifications)');
+        return;
       }
+      debugPrint('Push : autorisation ${autorisation.authorizationStatus}');
       FirebaseMessaging.onBackgroundMessage(_surMessageArrierePlan);
       // sans ça, iOS n'affiche aucune notification quand l'app est au premier plan
       await messaging.setForegroundNotificationPresentationOptions(
           alert: true, badge: true, sound: true);
 
       final jeton = await _jetonFcm(messaging);
-      if (jeton != null) await _enregistrer(jeton);
+      if (jeton == null) {
+        debugPrint('Push : aucun jeton FCM, appareil non enregistré');
+      } else {
+        await _enregistrer(jeton);
+      }
       messaging.onTokenRefresh.listen(_enregistrer);
 
       // tap sur la notif → ouvre la fiche (app en fond, puis app lancée à froid)
@@ -63,7 +72,8 @@ abstract final class Push {
         jetonApns = await messaging.getAPNSToken();
       }
       if (jetonApns == null) {
-        debugPrint('Push : aucun jeton APNs (simulateur, ou capability absente)');
+        debugPrint('Push : aucun jeton APNs après 5 tentatives '
+            '(simulateur, capability absente, ou clé APNs manquante dans Firebase)');
         return null;
       }
     }
@@ -77,8 +87,12 @@ abstract final class Push {
         'plateforme': Platform.isIOS ? 'ios' : 'android',
       }) as Map<String, dynamic>;
       _idAppareil = reponse['id_appareil'] as int?;
-    } catch (_) {
-      // déjà enregistré ou API indisponible : sans gravité
+      debugPrint('Push : appareil enregistré (id $_idAppareil)');
+    } catch (e) {
+      // l'app reste utilisable sans push, mais l'échec était jusqu'ici muet :
+      // une table `appareil` vide ne disait pas si le POST avait échoué,
+      // si le jeton manquait, ou si l'autorisation avait été refusée.
+      debugPrint('Push : enregistrement de l\'appareil refusé — $e');
     }
   }
 
