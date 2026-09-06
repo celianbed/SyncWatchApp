@@ -50,8 +50,11 @@ class Session extends ChangeNotifier {
       final jeton = await _stockage.read(key: _cleJeton);
       if (jeton != null) {
         api.jeton = jeton;
-        utilisateur = await _profil();
+        // Avant `_profil()`, et pas après : si le profil échoue (API en train
+        // de se réveiller, réseau capricieux), on partait au catch et
+        // l'appareil n'était jamais enregistré de toute la session.
         Push.initialiser(); // enregistre l'appareil pour les notifs push (iOS et Android)
+        utilisateur = await _profil();
       }
     } catch (_) {
       api.jeton = null; // jeton périmé ou API injoignable : on repart propre
