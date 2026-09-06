@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -35,6 +36,9 @@ bool get googleDisponible =>
 class Session extends ChangeNotifier {
   static const _cleJeton = 'jeton_syncwatch';
   static const _cleOnboarding = 'onboarding_vu';
+
+  /// Le jeton va au trousseau : c'est un secret, et l'y garder évite de
+  /// déconnecter quelqu'un qui réinstalle l'app.
   final _stockage = const FlutterSecureStorage();
 
   Utilisateur? utilisateur;
@@ -46,7 +50,12 @@ class Session extends ChangeNotifier {
   Future<void> restaurer() async {
     api.surNonAutorise = deconnexion; // session expirée → retour connexion
     try {
-      onboardingVu = await _stockage.read(key: _cleOnboarding) != null;
+      // Le drapeau de présentation n'est pas un secret et doit disparaître à
+      // la désinstallation — au trousseau, il survivait à tout, si bien que la
+      // présentation ne se revoyait jamais, même sur une installation neuve.
+      onboardingVu = (await SharedPreferences.getInstance())
+              .getBool(_cleOnboarding) ??
+          false;
       final jeton = await _stockage.read(key: _cleJeton);
       if (jeton != null) {
         api.jeton = jeton;
@@ -65,8 +74,8 @@ class Session extends ChangeNotifier {
 
   Future<void> terminerOnboarding() async {
     onboardingVu = true;
-    await _stockage.write(key: _cleOnboarding, value: '1');
     notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(_cleOnboarding, true);
   }
 
   Future<void> connexion(String identifiant, String motDePasse) async {
