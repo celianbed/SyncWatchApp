@@ -89,7 +89,22 @@ class _CarteAvisAmi extends StatelessWidget {
                   ],
                 ],
               ),
-              if ((avis.commentaire ?? '').trim().isNotEmpty) ...[
+              if (avis.masque) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.visibility_off_outlined,
+                        size: 14, color: CouleursSW.texteSecondaire),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                          'Avis masqué — ${avis.pseudo} est plus avancé que toi',
+                          style: typo.bodySmall?.copyWith(
+                              fontStyle: FontStyle.italic)),
+                    ),
+                  ],
+                ),
+              ] else if ((avis.commentaire ?? '').trim().isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(avis.commentaire!, style: typo.bodySmall?.copyWith(height: 1.4)),
               ],

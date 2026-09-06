@@ -164,13 +164,18 @@ class AvisAmi {
   final int? note;
   final String? commentaire;
 
+  /// L'API a retiré le commentaire : cette personne est plus avancée que vous
+  /// dans la série. La note, elle, ne divulgue rien et reste affichée.
+  final bool masque;
+
   AvisAmi.depuisJson(Map<String, dynamic> json)
       : idAvis = json['id_avis'] as int,
         idAuteur = (json['utilisateur'] as Map)['id_utilisateur'] as int,
         pseudo = (json['utilisateur'] as Map)['pseudo'] as String,
         avatar = (json['utilisateur'] as Map)['avatar'] as String?,
         note = json['note'] as int?,
-        commentaire = json['commentaire'] as String?;
+        commentaire = json['commentaire'] as String?,
+        masque = json['masque'] as bool? ?? false;
 }
 
 class Genre {
