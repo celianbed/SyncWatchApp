@@ -16,6 +16,28 @@ import UserNotifications
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
   }
 
+  // APNs ne rend pas de jeton et rien ne dit pourquoi : ces deux rappels sont
+  // les seuls endroits où iOS explique son refus (entitlement absent, appareil
+  // hors ligne, réseau bloquant APNs…). On les journalise avant de laisser
+  // FlutterAppDelegate faire suivre aux plugins.
+  override func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    print("Push/iOS : APNs a délivré un jeton (\(deviceToken.count) octets)")
+    super.application(
+      application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+  }
+
+  override func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    print("Push/iOS : APNs a refusé l'enregistrement — \(error)")
+    super.application(
+      application, didFailToRegisterForRemoteNotificationsWithError: error)
+  }
+
   /// La pastille de l'icône porte le nombre de notifications non lues au moment
   /// du push ; une fois l'app ouverte, elle a fait son travail. On l'efface à
   /// chaque activation. On observe la notification système plutôt que de
