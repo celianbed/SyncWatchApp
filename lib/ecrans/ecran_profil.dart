@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/client_api.dart';
 import '../api/session.dart';
@@ -207,6 +208,24 @@ class _EcranProfilState extends State<EcranProfil> {
                   ),
                   const Divider(height: 1),
                   ListTile(
+                    leading: const Icon(Icons.policy_outlined,
+                        color: CouleursSW.texteSecondaire, size: 22),
+                    title: Text('Confidentialité', style: typo.bodyMedium),
+                    trailing: const Icon(Icons.open_in_new,
+                        color: CouleursSW.texteSecondaire, size: 18),
+                    onTap: () => _ouvrirPageLegale('/confidentialite'),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.gavel_outlined,
+                        color: CouleursSW.texteSecondaire, size: 22),
+                    title: Text('Mentions légales', style: typo.bodyMedium),
+                    trailing: const Icon(Icons.open_in_new,
+                        color: CouleursSW.texteSecondaire, size: 18),
+                    onTap: () => _ouvrirPageLegale('/mentions-legales'),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
                     leading: const Icon(Icons.logout,
                         color: CouleursSW.danger, size: 22),
                     title: Text('Se déconnecter',
@@ -232,6 +251,17 @@ class _EcranProfilState extends State<EcranProfil> {
         ),
       ),
     );
+  }
+
+  /// Ouvre une page légale servie par l'API, dans le navigateur du système.
+  Future<void> _ouvrirPageLegale(String chemin) async {
+    final uri = Uri.parse('${ClientApi.urlBase}$chemin');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Impossible d\'ouvrir la page.')));
+      }
+    }
   }
 
   void _modifierProfil(BuildContext context, Utilisateur utilisateur) {

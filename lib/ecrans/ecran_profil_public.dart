@@ -6,6 +6,7 @@ import '../api/client_api.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/avatar_utilisateur.dart';
+import '../widgets/badge_ami.dart';
 import '../widgets/chargeur_async.dart';
 import '../widgets/rangee_resultats.dart';
 import 'ecran_communaute.dart';
@@ -194,26 +195,6 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
 }
 
 /// Badge « Ami » (suivi mutuel). Public : réutilisé aussi dans la rangée.
-class BadgeAmi extends StatelessWidget {
-  const BadgeAmi({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: CouleursSW.accentSecondaire.withValues(alpha: .18),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Text('Ami',
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: CouleursSW.accentSecondaire)),
-    );
-  }
-}
-
 class _BoutonSuivrePlein extends StatelessWidget {
   final bool abonne;
   final bool enCours;

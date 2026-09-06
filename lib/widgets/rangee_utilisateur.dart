@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
 import '../modeles/modeles.dart';
-import '../theme.dart';
 import 'avatar_utilisateur.dart';
+import 'badge_ami.dart';
 
 class RangeeUtilisateur extends StatefulWidget {
   final ResumeUtilisateur utilisateur;
@@ -80,7 +80,7 @@ class _RangeeUtilisateurState extends State<RangeeUtilisateur> {
                         ),
                         if (u.estAmi) ...[
                           const SizedBox(width: 6),
-                          const _BadgeAmi(),
+                          const BadgeAmi(petit: true),
                         ],
                       ],
                     ),
@@ -105,27 +105,6 @@ class _RangeeUtilisateurState extends State<RangeeUtilisateur> {
   }
 }
 
-class _BadgeAmi extends StatelessWidget {
-  const _BadgeAmi();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: CouleursSW.accentSecondaire.withValues(alpha: .18),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Text('Ami',
-          style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: CouleursSW.accentSecondaire)),
-    );
-  }
-}
-
-/// « Suivre » (plein) si pas abonné, « Abonné » (contour) si abonné.
 class _BoutonAbonnement extends StatelessWidget {
   final bool abonne;
   final bool enCours;

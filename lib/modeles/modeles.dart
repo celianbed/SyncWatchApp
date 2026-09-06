@@ -114,15 +114,13 @@ class AvisProfil {
   final String type; // "serie" | "film" | "episode"
   final int? referenceTmdb;
   final int? note;
-  final DateTime dateCreation;
 
   AvisProfil.depuisJson(Map<String, dynamic> json)
       : idAvis = json['id_avis'] as int,
         titre = json['titre'] as String,
         type = json['type'] as String,
         referenceTmdb = json['reference_tmdb'] as int?,
-        note = json['note'] as int?,
-        dateCreation = DateTime.parse(json['date_creation'] as String);
+        note = json['note'] as int?;
 }
 
 /// Un évènement du fil d'activité (une action d'une personne suivie).
@@ -448,14 +446,12 @@ const libellesStatutSuivi = {
 class StatsGlobales {
   final int episodesVus;
   final int filmsVus;
-  final int seriesSuivies;
   final int seriesTerminees;
   final int minutesTotales;
 
   StatsGlobales.depuisJson(Map<String, dynamic> json)
       : episodesVus = json['episodes_vus'] as int,
         filmsVus = json['films_vus'] as int,
-        seriesSuivies = json['series_suivies'] as int,
         seriesTerminees = json['series_terminees'] as int,
         minutesTotales = json['minutes_totales'] as int;
 }

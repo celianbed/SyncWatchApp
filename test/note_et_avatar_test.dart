@@ -104,8 +104,8 @@ class SessionLocale extends Session {
   }
 }
 
-Future<SessionLocale> ouvrirEditionProfil(WidgetTester tester,
-    {String? avatar}) async {
+/// Monte l'écran de profil seul (sans ouvrir la feuille d'édition).
+Future<SessionLocale> ouvrirProfil(WidgetTester tester, {String? avatar}) async {
   await tester.binding.setSurfaceSize(const Size(800, 1400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -125,15 +125,26 @@ Future<SessionLocale> ouvrirEditionProfil(WidgetTester tester,
         home: const Scaffold(body: EcranProfil())),
   ));
   await tester.pumpAndSettle();
+  return session;
+}
 
-  final entree = find.text('Modifier le profil');
-  await tester.scrollUntilVisible(entree, 200);
-  await tester.ensureVisible(entree);
-  await tester.pumpAndSettle();
-  await tester.tap(entree);
+/// Monte le profil puis ouvre « Modifier le profil ».
+Future<SessionLocale> ouvrirEditionProfil(WidgetTester tester,
+    {String? avatar}) async {
+  final session = await ouvrirProfil(tester, avatar: avatar);
+  await atteindre(tester, 'Modifier le profil');
+  await tester.tap(find.text('Modifier le profil'));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 500));
   return session;
+}
+
+/// Fait défiler la liste paresseuse jusqu'à l'entrée voulue.
+Future<void> atteindre(WidgetTester tester, String libelle) async {
+  final entree = find.text(libelle);
+  await tester.scrollUntilVisible(entree, 200);
+  await tester.ensureVisible(entree);
+  await tester.pumpAndSettle();
 }
 
 /// Les cases de la grille d'avatars — l'écran de profil, derrière la feuille,
@@ -205,6 +216,19 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(session.avatarEnvoye, '');
+    });
+  });
+
+  group('pages légales', () {
+    // elles étaient en ligne depuis le début sans qu'aucun écran n'y mène :
+    // rien dans l'app ne pointait vers la politique de confidentialité.
+    testWidgets('le profil mène aux mentions légales et à la confidentialité',
+        (tester) async {
+      await ouvrirProfil(tester);
+      await atteindre(tester, 'Mentions légales');
+
+      expect(find.text('Confidentialité'), findsOneWidget);
+      expect(find.text('Mentions légales'), findsOneWidget);
     });
   });
 }
