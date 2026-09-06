@@ -10,6 +10,7 @@ import '../api/session.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/avatars.dart';
+import '../util/validation.dart';
 import '../widgets/rangee_resultats.dart';
 import 'ecran_communaute.dart';
 import 'ecran_liste_resultats.dart';
@@ -586,9 +587,7 @@ class _FeuilleEditionProfilState extends State<_FeuilleEditionProfil> {
                 prefixIcon: Icon(Icons.person_outline,
                     color: CouleursSW.texteSecondaire, size: 20),
               ),
-              validator: (v) => (v == null || v.trim().length < 3)
-                  ? '3 caractères minimum'
-                  : null,
+              validator: erreurPseudo,
             ),
             const SizedBox(height: 20),
             Align(

@@ -10,6 +10,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../api/client_api.dart';
 import '../api/session.dart';
+import '../util/validation.dart';
 import '../theme.dart';
 import '../widgets/halo.dart';
 
@@ -262,10 +263,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
                                     size: 20,
                                   ),
                                 ),
-                                validator: (v) =>
-                                    (v == null || v.trim().length < 3)
-                                    ? '3 caractères minimum'
-                                    : null,
+                                validator: erreurPseudo,
                               ),
                               const SizedBox(height: 12),
                             ],
@@ -283,15 +281,12 @@ class _EcranConnexionState extends State<EcranConnexion> {
                                   size: 20,
                                 ),
                               ),
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Champ requis';
-                                }
-                                if (_inscription && !v.contains('@')) {
-                                  return 'Adresse mail invalide';
-                                }
-                                return null;
-                              },
+                              // à la connexion, ce champ accepte aussi un pseudo
+                              validator: (v) => _inscription
+                                  ? erreurAdresseMail(v)
+                                  : (v == null || v.trim().isEmpty)
+                                      ? 'Champ requis'
+                                      : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
@@ -317,12 +312,11 @@ class _EcranConnexionState extends State<EcranConnexion> {
                                   ),
                                 ),
                               ),
-                              validator: (v) =>
-                                  (_inscription && (v == null || v.length < 8))
-                                  ? '8 caractères minimum'
+                              validator: (v) => _inscription
+                                  ? erreurMotDePasse(v)
                                   : (v == null || v.isEmpty)
-                                  ? 'Champ requis'
-                                  : null,
+                                      ? 'Champ requis'
+                                      : null,
                               onFieldSubmitted: (_) => _valider(),
                             ),
                             if (!_inscription)

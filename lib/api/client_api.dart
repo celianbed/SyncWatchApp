@@ -29,8 +29,20 @@ String _messageErreur(http.Response reponse) {
   if (code < 500) {
     try {
       final corps = jsonDecode(utf8.decode(reponse.bodyBytes));
-      if (corps is Map && corps['detail'] is String) {
-        message = corps['detail'] as String;
+      if (corps is Map) {
+        final detail = corps['detail'];
+        if (detail is String) {
+          message = detail;
+        } else if (detail is List && detail.isNotEmpty) {
+          // filet : forme brute de FastAPI sur un 422 (liste d'objets {msg}).
+          // L'API la remplace par une phrase, mais sans ça un client à jour
+          // face à une API plus ancienne n'affichait que « erreur (422) ».
+          final phrases = [
+            for (final e in detail)
+              if (e is Map && e['msg'] is String) e['msg'] as String
+          ];
+          if (phrases.isNotEmpty) message = phrases.join(' ');
+        }
       }
     } catch (_) {}
   }
