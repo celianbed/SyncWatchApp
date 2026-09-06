@@ -19,6 +19,7 @@ Future<void> _surMessageArrierePlan(RemoteMessage message) async {}
 
 abstract final class Push {
   static bool _fait = false;
+  static bool _ecouteurs = false; // posés une seule fois, même après un échec
   static int? _idAppareil; // pour désinscrire l'appareil à la déconnexion
 
   /// À appeler une fois connecté (le POST /appareils exige le jeton). Idempotent.
@@ -33,26 +34,37 @@ abstract final class Push {
       if (autorisation.authorizationStatus == AuthorizationStatus.denied) {
         // refus : inutile d'enregistrer un appareil qui ne recevra rien.
         // Tracé, sinon l'absence de push est indiscernable d'une panne.
+        // `_fait` repart à false pour qu'un réglage réactivé plus tard soit
+        // pris en compte ; iOS ne repose pas la question, donc pas de risque
+        // de redemander l'autorisation en boucle.
+        _fait = false;
         debugPrint('Push : notifications refusées par l\'utilisateur '
             '(Réglages > SyncWatch > Notifications)');
         return;
       }
       debugPrint('Push : autorisation ${autorisation.authorizationStatus}');
-      FirebaseMessaging.onBackgroundMessage(_surMessageArrierePlan);
       // sans ça, iOS n'affiche aucune notification quand l'app est au premier plan
       await messaging.setForegroundNotificationPresentationOptions(
           alert: true, badge: true, sound: true);
 
+      if (!_ecouteurs) {
+        _ecouteurs = true;
+        FirebaseMessaging.onBackgroundMessage(_surMessageArrierePlan);
+        messaging.onTokenRefresh.listen(_enregistrer);
+        // tap sur la notif → ouvre la fiche (app en fond, puis app à froid)
+        FirebaseMessaging.onMessageOpenedApp.listen(_ouvrir);
+      }
+
       final jeton = await _jetonFcm(messaging);
       if (jeton == null) {
+        // rien n'a été enregistré : ne pas verrouiller l'état « fait », sinon
+        // aucune nouvelle tentative n'a lieu de toute la vie du processus.
+        _fait = false;
         debugPrint('Push : aucun jeton FCM, appareil non enregistré');
       } else {
         await _enregistrer(jeton);
       }
-      messaging.onTokenRefresh.listen(_enregistrer);
 
-      // tap sur la notif → ouvre la fiche (app en fond, puis app lancée à froid)
-      FirebaseMessaging.onMessageOpenedApp.listen(_ouvrir);
       final initial = await messaging.getInitialMessage();
       if (initial != null) _ouvrir(initial);
     } catch (e) {
@@ -61,19 +73,27 @@ abstract final class Push {
     }
   }
 
-  /// Sur iOS, FCM ne peut rien donner tant qu'APNs ne lui a pas remis son jeton,
-  /// qui arrive un court instant après le lancement — d'où les tentatives.
+  /// Nombre de tentatives d'obtention du jeton APNs, espacées d'une seconde.
+  /// iOS ne démarre l'enregistrement qu'à `requestPermission()`, et le premier
+  /// aller-retour avec Apple dépasse volontiers cinq secondes sur une
+  /// installation neuve — c'était l'ancienne limite, et elle expirait.
+  static const _essaisApns = 20;
+
+  /// Sur iOS, FCM ne peut rien donner tant qu'APNs ne lui a pas remis son jeton.
   /// Le simulateur, lui, n'en fournit jamais : on abandonne proprement.
   static Future<String?> _jetonFcm(FirebaseMessaging messaging) async {
     if (Platform.isIOS) {
       var jetonApns = await messaging.getAPNSToken();
-      for (var essai = 0; jetonApns == null && essai < 5; essai++) {
+      for (var essai = 1; jetonApns == null && essai <= _essaisApns; essai++) {
         await Future.delayed(const Duration(seconds: 1));
         jetonApns = await messaging.getAPNSToken();
+        if (jetonApns != null) {
+          debugPrint('Push : jeton APNs obtenu après $essai s');
+        }
       }
       if (jetonApns == null) {
-        debugPrint('Push : aucun jeton APNs après 5 tentatives '
-            '(simulateur, capability absente, ou clé APNs manquante dans Firebase)');
+        debugPrint('Push : aucun jeton APNs après $_essaisApns s — '
+            'simulateur, appareil hors ligne, ou réseau bloquant APNs');
         return null;
       }
     }
