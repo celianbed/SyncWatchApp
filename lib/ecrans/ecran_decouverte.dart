@@ -2,6 +2,7 @@
 // tendance. Un seul lecteur YouTube partagé : on change de vidéo au swipe
 // (loadVideoById) plutôt que d'instancier une WebView par page.
 import 'dart:async';
+import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -37,6 +38,12 @@ class _EcranDecouverteState extends State<EcranDecouverte>
   bool _chargement = false;
   String? _erreur;
   int _pageChargee = 0; // dernière page de tendances chargée (feed infini)
+
+  /// Les « tendances de la semaine » de TMDB ne bougent qu'une fois par
+  /// semaine : démarrer toujours à la page 1 montrait les mêmes vingt titres
+  /// pendant sept jours. On entre dans la liste au hasard.
+  static const _pagesTendances = 20;
+  final _premierePage = Random().nextInt(_pagesTendances) + 1;
   bool _chargeSuivant = false; // garde-fou : un seul préchargement à la fois
   final Set<String> _ajoutes = {}; // "type:reference" déjà suivis pendant la session
 
@@ -111,7 +118,7 @@ class _EcranDecouverteState extends State<EcranDecouverte>
       _erreur = null;
     });
     try {
-      final items = await _chargerPage(1);
+      final items = await _chargerPage(_premierePage);
       if (!mounted) return;
       _sousEtat?.cancel();
       _controleur?.close();
@@ -137,7 +144,7 @@ class _EcranDecouverteState extends State<EcranDecouverte>
         _items = items;
         _controleur = ctrl;
         _index = 0;
-        _pageChargee = 1;
+        _pageChargee = _premierePage;
         _demarrageForce = false;
         _videoIndisponible = false;
         _enLecture = true;
@@ -171,7 +178,7 @@ class _EcranDecouverteState extends State<EcranDecouverte>
       var nouveaux = await _chargerPage(page);
       if (nouveaux.isEmpty) {
         page = 1; // fin des tendances → on reboucle
-        nouveaux = await _chargerPage(1);
+        nouveaux = await _chargerPage(page);
       }
       if (mounted && nouveaux.isNotEmpty) {
         setState(() {
