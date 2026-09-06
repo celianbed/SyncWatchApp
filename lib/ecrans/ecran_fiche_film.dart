@@ -26,6 +26,8 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
   late Future<List<ResultatRecherche>> _similaires;
   bool _dejaVu = false; // état calculé côté API (présence dans visionner_film)
   int _nbVus = 0;
+  bool _aVoirActif = false; // le film est-il en attente dans « À voir » ?
+  bool _bascule = false; // évite un double envoi si on tape deux fois vite
 
   @override
   void initState() {
@@ -44,6 +46,7 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
       setState(() {
         _dejaVu = etat['deja_vu'] as bool;
         _nbVus = etat['nombre_visionnages'] as int;
+        _aVoirActif = etat['dans_a_voir'] as bool? ?? false;
       });
     } catch (_) {
       // silencieux : on garde l'état par défaut (non vu)
@@ -77,7 +80,12 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
     try {
       final res = await api.post('/films/${widget.referenceTmdb}/vu')
           as Map<String, dynamic>;
-      if (mounted) setState(() => _nbVus = res['nombre_visionnages'] as int);
+      if (mounted) {
+        setState(() {
+          _nbVus = res['nombre_visionnages'] as int;
+          _aVoirActif = false; // l'API bascule le statut : ce n'est plus « à voir »
+        });
+      }
       _snack(_nbVus > 1 ? 'Revu ✓ ($_nbVus fois)' : 'Film marqué vu ✓');
     } on ExceptionApi catch (e) {
       if (mounted) {
@@ -90,13 +98,29 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
     }
   }
 
-  Future<void> _aVoir() async {
+  /// Ajoute ou retire le film de la liste « À voir ». Un ajout par mégarde doit
+  /// pouvoir se défaire : le même bouton fait les deux, selon son état.
+  Future<void> _basculerAVoir() async {
+    if (_bascule) return;
+    final avant = _aVoirActif;
+    setState(() {
+      _bascule = true;
+      _aVoirActif = !avant; // optimiste : le bouton change tout de suite
+    });
     try {
-      await api.post('/films/${widget.referenceTmdb}/suivre',
-          corps: const {'statut': 'a_voir'});
-      _snack('Ajouté à ta liste « À voir »');
+      if (avant) {
+        await api.delete('/films/${widget.referenceTmdb}/suivre');
+        _snack('Retiré de ta liste');
+      } else {
+        await api.post('/films/${widget.referenceTmdb}/suivre',
+            corps: const {'statut': 'a_voir'});
+        _snack('Ajouté à ta liste « À voir »');
+      }
     } on ExceptionApi catch (e) {
-      _snack(e.code == 409 ? 'Déjà dans ta liste.' : e.message);
+      if (mounted) setState(() => _aVoirActif = avant);
+      _snack(e.message);
+    } finally {
+      if (mounted) setState(() => _bascule = false);
     }
   }
 
@@ -174,18 +198,32 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
                       icon: const Icon(Icons.check, size: 20),
                       label: const Text('Marquer vu')),
               const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _aVoir,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: CouleursSW.accent,
-                  side: const BorderSide(color: CouleursSW.accent),
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-                icon: const Icon(Icons.bookmark_add_outlined, size: 20),
-                label: const Text('À voir plus tard'),
-              ),
+              // Un seul bouton pour les deux sens : plein quand le film est dans
+              // la liste, à liseré sinon — même grammaire que le bouton « Vu ».
+              _aVoirActif
+                  ? ElevatedButton.icon(
+                      onPressed: _basculerAVoir,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CouleursSW.accent,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.bookmark, size: 20),
+                      label: const Text('Dans ma liste · retirer'))
+                  : OutlinedButton.icon(
+                      onPressed: _basculerAVoir,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: CouleursSW.accent,
+                        side: const BorderSide(color: CouleursSW.accent),
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.bookmark_add_outlined, size: 20),
+                      label: const Text('À voir plus tard'),
+                    ),
               if (film.synopsis != null && film.synopsis!.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 Text(film.synopsis!,
