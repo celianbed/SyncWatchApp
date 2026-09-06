@@ -369,12 +369,21 @@ class EpisodeDansSaison {
   final int? duree;
   final DateTime? dateDiffusion;
 
+  /// Vu par moi. Mutable : les bascules de la fiche l'écrivent avant la
+  /// réponse du serveur, et la remettent en place si l'appel échoue.
+  bool vu;
+
   EpisodeDansSaison.depuisJson(Map<String, dynamic> json)
       : idEpisode = json['id_episode'] as int,
         numEpisode = json['num_episode'] as int,
         titre = json['titre'] as String?,
         duree = json['duree'] as int?,
-        dateDiffusion = _date(json['date_diffusion']);
+        dateDiffusion = _date(json['date_diffusion']),
+        vu = json['vu'] as bool? ?? false;
+
+  /// Un épisode non encore diffusé ne se marque pas vu.
+  bool get diffuse =>
+      dateDiffusion != null && !dateDiffusion!.isAfter(DateTime.now());
 }
 
 class SaisonAvecEpisodes {
@@ -493,21 +502,16 @@ class NotificationPublique {
         cible = json['cible'] as String?;
 }
 
-/// Progression estimée d'une série : l'API expose le prochain épisode non vu,
-/// on considère vus tous les épisodes qui le précèdent (visionnage linéaire).
-/// `prochain` à null = série entièrement vue. Saisons spéciales (0) exclues.
-({int vus, int total}) progressionSerie(
-    List<SaisonAvecEpisodes> saisons, ProchainEpisode? prochain) {
+/// Progression d'une série, comptée sur l'état réel de chaque épisode.
+/// Saisons spéciales (0) exclues. Auparavant elle était déduite du « prochain
+/// épisode non vu » — tout ce qui le précédait était compté vu ; dé-marquer un
+/// épisode au milieu rendait ce raccourci faux.
+({int vus, int total}) progressionSerie(List<SaisonAvecEpisodes> saisons) {
   var vus = 0, total = 0;
   for (final saison in saisons.where((s) => s.numSaison > 0)) {
     for (final episode in saison.episodes) {
       total++;
-      if (prochain == null ||
-          saison.numSaison < prochain.numSaison ||
-          (saison.numSaison == prochain.numSaison &&
-              episode.numEpisode < prochain.numEpisode)) {
-        vus++;
-      }
+      if (episode.vu) vus++;
     }
   }
   return (vus: vus, total: total);

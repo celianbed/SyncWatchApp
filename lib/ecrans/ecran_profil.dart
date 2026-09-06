@@ -8,6 +8,7 @@ import '../api/client_api.dart';
 import '../api/session.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
+import '../util/avatars.dart';
 import '../widgets/rangee_resultats.dart';
 import 'ecran_communaute.dart';
 import 'ecran_liste_resultats.dart';
@@ -479,21 +480,30 @@ class _FeuilleEditionProfil extends StatefulWidget {
 class _FeuilleEditionProfilState extends State<_FeuilleEditionProfil> {
   final _formulaire = GlobalKey<FormState>();
   late final _pseudo = TextEditingController(text: widget.utilisateur.pseudo);
-  late final _avatar =
-      TextEditingController(text: widget.utilisateur.avatar ?? '');
+  late String _avatar = widget.utilisateur.avatar ?? '';
   bool _chargement = false;
+
+  /// La grille : les avatars proposés, plus celui déjà porté s'il vient
+  /// d'ailleurs (un compte plus ancien avait pu coller n'importe quelle URL).
+  List<String> get _choix {
+    final actuel = widget.utilisateur.avatar;
+    return [
+      if (actuel != null && actuel.isNotEmpty && !avatarsProposes.contains(actuel))
+        actuel,
+      ...avatarsProposes,
+    ];
+  }
 
   @override
   void dispose() {
     _pseudo.dispose();
-    _avatar.dispose();
     super.dispose();
   }
 
   Future<void> _enregistrer() async {
     if (!_formulaire.currentState!.validate()) return;
     final pseudo = _pseudo.text.trim();
-    final avatar = _avatar.text.trim();
+    final avatar = _avatar;
     final pseudoChange = pseudo != widget.utilisateur.pseudo;
     final avatarChange = avatar != (widget.utilisateur.avatar ?? '');
     if (!pseudoChange && !avatarChange) {
@@ -501,13 +511,15 @@ class _FeuilleEditionProfilState extends State<_FeuilleEditionProfil> {
       return;
     }
     setState(() => _chargement = true);
+    // capturé avant le pop : après, ce contexte n'a plus de Scaffold sous lui
+    final messager = ScaffoldMessenger.of(context);
     try {
       await context.read<Session>().mettreAJourProfil(
           pseudo: pseudoChange ? pseudo : null,
           avatar: avatarChange ? avatar : null);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      messager.showSnackBar(
           const SnackBar(content: Text('Profil mis à jour ✓')));
     } on ExceptionApi catch (e) {
       if (mounted) {
@@ -548,22 +560,16 @@ class _FeuilleEditionProfilState extends State<_FeuilleEditionProfil> {
                   ? '3 caractères minimum'
                   : null,
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _avatar,
-              keyboardType: TextInputType.url,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                hintText: 'URL de l’avatar (vide = aucun)',
-                prefixIcon: Icon(Icons.image_outlined,
-                    color: CouleursSW.texteSecondaire, size: 20),
-              ),
-              validator: (v) {
-                final url = v?.trim() ?? '';
-                return url.isEmpty || url.startsWith('http')
-                    ? null
-                    : 'URL invalide (http/https)';
-              },
+            const SizedBox(height: 20),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Avatar', style: typo.labelSmall),
+            ),
+            const SizedBox(height: 10),
+            _GrilleAvatars(
+              choix: _choix,
+              selection: _avatar,
+              surChoisir: (url) => setState(() => _avatar = url),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
@@ -578,6 +584,81 @@ class _FeuilleEditionProfilState extends State<_FeuilleEditionProfil> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Grille de choix d'avatar : la sélection est visible tout de suite, elle
+/// part au serveur avec le reste du formulaire. La première case retire
+/// l'avatar et rend les initiales.
+class _GrilleAvatars extends StatelessWidget {
+  final List<String> choix;
+  final String selection;
+  final ValueChanged<String> surChoisir;
+
+  const _GrilleAvatars(
+      {required this.choix, required this.selection, required this.surChoisir});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 168,
+      child: GridView.count(
+        crossAxisCount: 5,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        padding: EdgeInsets.zero,
+        children: [
+          _CaseAvatar(
+            selectionne: selection.isEmpty,
+            surTape: () => surChoisir(''),
+            child: const Icon(Icons.person_off_outlined,
+                color: CouleursSW.texteSecondaire, size: 22),
+          ),
+          for (final url in choix)
+            _CaseAvatar(
+              selectionne: selection == url,
+              surTape: () => surChoisir(url),
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: url,
+                  fit: BoxFit.cover,
+                  placeholder: (_, _) => const SizedBox.shrink(),
+                  errorWidget: (_, _, _) => const Icon(Icons.broken_image,
+                      color: CouleursSW.texteSecondaire, size: 20),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaseAvatar extends StatelessWidget {
+  final bool selectionne;
+  final VoidCallback surTape;
+  final Widget child;
+
+  const _CaseAvatar(
+      {required this.selectionne, required this.surTape, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: surTape,
+      child: Container(
+        decoration: BoxDecoration(
+          color: CouleursSW.surface,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selectionne ? CouleursSW.accent : Colors.transparent,
+            width: 2.5,
+          ),
+        ),
+        padding: const EdgeInsets.all(2),
+        child: Center(child: child),
       ),
     );
   }

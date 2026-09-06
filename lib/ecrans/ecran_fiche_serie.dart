@@ -34,8 +34,6 @@ class EcranFicheSerie extends StatefulWidget {
 class _EcranFicheSerieState extends State<EcranFicheSerie> {
   SeriePublique? _serie;
   List<SaisonAvecEpisodes> _saisons = [];
-  ProchainEpisode? _prochain;
-  bool _touteVue = false; // prochain == null ET série au cache
   SuiviPublic? _suivi;
   bool _chargement = true;
   String? _erreur;
@@ -81,8 +79,6 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
       // Saisons, prochain épisode et suivi : absents tant que personne ne suit
       // la série (cache non rempli) — un 404 ici est un état normal.
       var saisons = <SaisonAvecEpisodes>[];
-      ProchainEpisode? prochain;
-      var touteVue = false;
       SuiviPublic? suivi;
       try {
         final donnees =
@@ -91,13 +87,6 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
           for (final s in donnees)
             SaisonAvecEpisodes.depuisJson(s as Map<String, dynamic>)
         ];
-        final brut =
-            await api.get('/series/${widget.referenceTmdb}/prochain-episode');
-        if (brut == null) {
-          touteVue = true;
-        } else {
-          prochain = ProchainEpisode.depuisJson(brut as Map<String, dynamic>);
-        }
       } on ExceptionApi catch (e) {
         if (e.code != 404) rethrow;
       }
@@ -114,8 +103,6 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
       setState(() {
         _serie = serie;
         _saisons = saisons;
-        _prochain = prochain;
-        _touteVue = touteVue;
         _suivi = suivi;
         _chargement = false;
       });
@@ -138,6 +125,7 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
     try {
       await api.post('/series/${widget.referenceTmdb}/suivre',
           corps: const {'statut_suivi': 'en_cours'});
+      _snack('Série suivie ✓');
       // suivre remplit le cache (saisons, épisodes) : on les charge en fond, sans spinner
       await _charger(silencieux: true);
     } on ExceptionApi catch (e) {
@@ -153,6 +141,7 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
     try {
       await api.patch('/series/${widget.referenceTmdb}/suivre',
           corps: {'statut_suivi': statut});
+      _snack('Série marquée « ${libellesStatutSuivi[statut]} » ✓');
     } on ExceptionApi catch (e) {
       if (mounted) setState(() => _suivi = avant); // rollback
       _snack(e.message);
@@ -164,27 +153,70 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
     setState(() => _suivi = null); // optimiste
     try {
       await api.delete('/series/${widget.referenceTmdb}/suivre');
+      _snack('Tu ne suis plus cette série');
     } on ExceptionApi catch (e) {
       if (mounted) setState(() => _suivi = avant); // rollback
       _snack(e.message);
     }
   }
 
-  Future<void> _marquerEpisodeVu(int idEpisode) async {
+  /// Bascule un épisode vu / non vu. La coche change immédiatement, l'appel
+  /// part derrière, et l'état revient en place s'il échoue. [aussi] rebâtit la
+  /// feuille de saison, qui a son propre State et n'écoute pas celui-ci.
+  Future<void> _basculerEpisode(EpisodeDansSaison episode,
+      {required String libelle, VoidCallback? aussi}) async {
+    final avant = episode.vu;
+    setState(() => episode.vu = !avant);
+    aussi?.call();
     try {
-      await api.post('/episodes/$idEpisode/vu');
-      await _charger(silencieux: true); // maj de la progression sans spinner global
+      if (avant) {
+        await api.delete('/episodes/${episode.idEpisode}/vu');
+        _snack('$libelle retiré des épisodes vus');
+      } else {
+        await api.post('/episodes/${episode.idEpisode}/vu');
+        _snack('$libelle marqué vu ✓');
+      }
     } on ExceptionApi catch (e) {
+      if (mounted) setState(() => episode.vu = avant);
+      aussi?.call();
       _snack(e.message);
     }
   }
 
-  Future<void> _marquerSaisonVue(SaisonAvecEpisodes saison) async {
+  /// Marque ou dé-marque toute la saison — un « Tout marquer vu » par mégarde
+  /// doit pouvoir se défaire d'un geste.
+  Future<void> _basculerSaison(SaisonAvecEpisodes saison,
+      {VoidCallback? aussi}) async {
+    final diffuses = saison.episodes.where((e) => e.diffuse).toList();
+    if (diffuses.isEmpty) return;
+    final toutVu = diffuses.every((e) => e.vu);
+    final avant = {for (final e in saison.episodes) e.idEpisode: e.vu};
+
+    setState(() {
+      // dé-marquer efface toute la saison, y compris un épisode non diffusé
+      // qui aurait été marqué à la main ; marquer ne touche que le diffusé.
+      for (final e in toutVu ? saison.episodes : diffuses) {
+        e.vu = !toutVu;
+      }
+    });
+    aussi?.call();
     try {
-      await api.post('/saisons/${saison.idSaison}/vu');
-      _snack('Saison ${saison.numSaison} marquée vue ✓');
-      await _charger(silencieux: true);
+      if (toutVu) {
+        await api.delete('/saisons/${saison.idSaison}/vu');
+        _snack('Saison ${saison.numSaison} retirée des vus');
+      } else {
+        await api.post('/saisons/${saison.idSaison}/vu');
+        _snack('Saison ${saison.numSaison} marquée vue ✓');
+      }
     } on ExceptionApi catch (e) {
+      if (mounted) {
+        setState(() {
+          for (final e in saison.episodes) {
+            e.vu = avant[e.idEpisode]!;
+          }
+        });
+      }
+      aussi?.call();
       _snack(e.message);
     }
   }
@@ -222,8 +254,7 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
 
     final serie = _serie!;
     final typo = Theme.of(context).textTheme;
-    final progression =
-        progressionSerie(_saisons, _touteVue ? null : _prochain);
+    final progression = progressionSerie(_saisons);
 
     return Scaffold(
       body: ListView(
@@ -277,7 +308,6 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
                       in _saisons.where((s) => s.numSaison > 0)) ...[
                     _CarteSaison(
                         saison: saison,
-                        prochain: _touteVue ? null : _prochain,
                         surOuvrir: () => _ouvrirSaison(saison)),
                     const SizedBox(height: 12),
                   ],
@@ -371,74 +401,88 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
     );
   }
 
+  /// Feuille de la saison : chaque ligne se coche et se décoche sur place, la
+  /// feuille reste ouverte. `majFeuille` la rebâtit — elle a son propre State.
   void _ouvrirSaison(SaisonAvecEpisodes saison) {
-    final prochain = _touteVue ? null : _prochain;
-    bool episodeVu(EpisodeDansSaison episode) =>
-        prochain == null ||
-        saison.numSaison < prochain.numSaison ||
-        (saison.numSaison == prochain.numSaison &&
-            episode.numEpisode < prochain.numEpisode);
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (contexteFeuille) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: .6,
-        builder: (_, defilement) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 16, 8),
-              child: Row(
-                children: [
-                  Text('Saison ${saison.numSaison}',
-                      style: Theme.of(context).textTheme.titleLarge),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(contexteFeuille).pop();
-                      _marquerSaisonVue(saison);
-                    },
-                    child: const Text('Tout marquer vu'),
+      builder: (contexteFeuille) => StatefulBuilder(
+        builder: (_, majFeuille) {
+          void rafraichir() {
+            if (contexteFeuille.mounted) majFeuille(() {});
+          }
+
+          final diffuses = saison.episodes.where((e) => e.diffuse).toList();
+          final toutVu = diffuses.isNotEmpty && diffuses.every((e) => e.vu);
+
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: .6,
+            builder: (_, defilement) => Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 16, 8),
+                  child: Row(
+                    children: [
+                      Text('Saison ${saison.numSaison}',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: diffuses.isEmpty
+                            ? null
+                            : () => _basculerSaison(saison, aussi: rafraichir),
+                        child: Text(
+                            toutVu ? 'Tout dé-marquer' : 'Tout marquer vu'),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    controller: defilement,
+                    itemCount: saison.episodes.length,
+                    itemBuilder: (_, i) {
+                      final episode = saison.episodes[i];
+                      final numero =
+                          'S${saison.numSaison.toString().padLeft(2, '0')}'
+                          'E${episode.numEpisode.toString().padLeft(2, '0')}';
+                      return ListTile(
+                        leading: Text(
+                            episode.numEpisode.toString().padLeft(2, '0'),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: CouleursSW.texteSecondaire)),
+                        title: Text(
+                            episode.titre ?? 'Épisode ${episode.numEpisode}',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                        subtitle: episode.diffuse
+                            ? null
+                            : const Text('Pas encore diffusé'),
+                        trailing: Icon(
+                            episode.vu
+                                ? Icons.check_circle
+                                : Icons.check_circle_outline,
+                            color: episode.vu
+                                ? CouleursSW.succes
+                                : CouleursSW.texteSecondaire),
+                        // un épisode vu se décoche : c'est le rattrapage d'un
+                        // clic malencontreux, il n'y en avait aucun avant.
+                        onTap: episode.diffuse || episode.vu
+                            ? () => _basculerEpisode(episode,
+                                libelle: numero, aussi: rafraichir)
+                            : null,
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-            Expanded(
-              child: ListView.builder(
-                controller: defilement,
-                itemCount: saison.episodes.length,
-                itemBuilder: (_, i) {
-                  final episode = saison.episodes[i];
-                  final vu = episodeVu(episode);
-                  return ListTile(
-                    leading: Text(
-                        episode.numEpisode.toString().padLeft(2, '0'),
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: CouleursSW.texteSecondaire)),
-                    title: Text(episode.titre ?? 'Épisode ${episode.numEpisode}',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                    trailing: Icon(
-                        vu ? Icons.check_circle : Icons.check_circle_outline,
-                        color: vu
-                            ? CouleursSW.succes
-                            : CouleursSW.texteSecondaire),
-                    onTap: vu
-                        ? null
-                        : () {
-                            Navigator.of(contexteFeuille).pop();
-                            _marquerEpisodeVu(episode.idEpisode);
-                          },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -500,24 +544,14 @@ class _Bandeau extends StatelessWidget {
 
 class _CarteSaison extends StatelessWidget {
   final SaisonAvecEpisodes saison;
-  final ProchainEpisode? prochain;
   final VoidCallback surOuvrir;
 
-  const _CarteSaison(
-      {required this.saison, required this.prochain, required this.surOuvrir});
+  const _CarteSaison({required this.saison, required this.surOuvrir});
 
   @override
   Widget build(BuildContext context) {
     final typo = Theme.of(context).textTheme;
-    var vus = 0;
-    for (final episode in saison.episodes) {
-      if (prochain == null ||
-          saison.numSaison < prochain!.numSaison ||
-          (saison.numSaison == prochain!.numSaison &&
-              episode.numEpisode < prochain!.numEpisode)) {
-        vus++;
-      }
-    }
+    final vus = saison.episodes.where((e) => e.vu).length;
     final total = saison.episodes.length;
     final complete = total > 0 && vus == total;
 

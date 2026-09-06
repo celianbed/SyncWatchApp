@@ -65,6 +65,12 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
     try {
       final chemin = '/utilisateurs/${p.idUtilisateur}/abonner';
       avant ? await api.delete(chemin) : await api.post(chemin);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(avant
+                ? 'Tu ne suis plus ${p.pseudo}'
+                : 'Tu suis ${p.pseudo} ✓')));
+      }
     } on ExceptionApi catch (e) {
       if (!mounted) return;
       setState(() {

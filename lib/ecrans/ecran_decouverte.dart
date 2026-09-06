@@ -215,17 +215,16 @@ class _EcranDecouverteState extends State<EcranDecouverte>
     final chemin = e.estSerie
         ? '/series/${e.referenceTmdb}/suivre'
         : '/films/${e.referenceTmdb}/suivre';
+    setState(() => _ajoutes.add(cle)); // optimiste : le bouton bascule tout de suite
     try {
       await api.post(chemin);
-      if (!mounted) return;
-      setState(() => _ajoutes.add(cle));
       _message(e.estSerie ? 'Ajoutée à tes séries' : 'Ajouté à ta liste à voir');
     } on ExceptionApi catch (ex) {
       if (!mounted) return;
       if (ex.code == 409) {
-        setState(() => _ajoutes.add(cle)); // déjà suivi = objectif atteint
-        _message('Déjà dans ta liste');
+        _message('Déjà dans ta liste'); // déjà suivi = objectif atteint
       } else {
+        setState(() => _ajoutes.remove(cle)); // rollback
         _message(ex.message);
       }
     }

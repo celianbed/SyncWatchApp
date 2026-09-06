@@ -30,6 +30,10 @@ class _EcranAccueilState extends State<EcranAccueil> {
   // Progressions par série (référence TMDB) — un seul appel saisons par série.
   final _progressions = <int, Future<({int vus, int total})>>{};
 
+  // Épisodes qu'on vient de marquer vus : retirés de la liste tout de suite,
+  // sans attendre le serveur. Vidé dès que la liste revient rechargée.
+  final _marques = <int>{};
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +71,8 @@ class _EcranAccueilState extends State<EcranAccueil> {
       _chargerDecouverte();
     });
     await _entrees;
+    // la liste rechargée fait autorité : elle porte déjà l'épisode suivant
+    if (mounted) setState(_marques.clear);
   }
 
   Future<({int vus, int total})> _progression(AccueilEntree entree) =>
@@ -77,22 +83,44 @@ class _EcranAccueilState extends State<EcranAccueil> {
           for (final s in donnees)
             SaisonAvecEpisodes.depuisJson(s as Map<String, dynamic>)
         ];
-        return progressionSerie(saisons, entree.episode);
+        return progressionSerie(saisons);
       });
 
+  /// Marque l'épisode vu : la carte disparaît immédiatement, l'appel part
+  /// derrière, et la carte revient si le serveur refuse.
   Future<void> _marquerVu(AccueilEntree entree) async {
+    final idEpisode = entree.episode.idEpisode;
+    setState(() => _marques.add(idEpisode));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('${entree.serie.titre} ${entree.episode.code} marqué vu ✓'),
+      action: SnackBarAction(
+          label: 'Annuler', onPressed: () => _annulerVu(entree)),
+    ));
     try {
-      await api.post('/episodes/${entree.episode.idEpisode}/vu');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              '${entree.serie.titre} ${entree.episode.code} marqué vu ✓')));
+      await api.post('/episodes/$idEpisode/vu');
       await _rafraichir();
     } on ExceptionApi catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
-      }
+      if (!mounted) return;
+      setState(() => _marques.remove(idEpisode));
+      _message(e.message);
+    }
+  }
+
+  /// Défait le marquage sur simple pression de « Annuler ».
+  Future<void> _annulerVu(AccueilEntree entree) async {
+    try {
+      await api.delete('/episodes/${entree.episode.idEpisode}/vu');
+      await _rafraichir();
+      _message('${entree.episode.code} remis en non vu');
+    } on ExceptionApi catch (e) {
+      _message(e.message);
+    }
+  }
+
+  void _message(String texte) {
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(texte)));
     }
   }
 
@@ -119,7 +147,10 @@ class _EcranAccueilState extends State<EcranAccueil> {
                   texte: 'API injoignable.\n${instantane.error}',
                   surReessayer: _rafraichir);
             }
-            final entrees = instantane.data ?? [];
+            final entrees = [
+              for (final e in instantane.data ?? <AccueilEntree>[])
+                if (!_marques.contains(e.episode.idEpisode)) e
+            ];
             return ListView(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               children: [

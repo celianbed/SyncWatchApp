@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:syncwatch_mobile/modeles/modeles.dart';
 import 'package:syncwatch_mobile/util/format.dart';
 
-SaisonAvecEpisodes saison(int num, int nbEpisodes) =>
+/// Saison de `nbEpisodes`, dont les `vus` premiers sont marqués vus.
+SaisonAvecEpisodes saison(int num, int nbEpisodes, {int vus = 0}) =>
     SaisonAvecEpisodes.depuisJson({
       'id_saison': num,
       'num_saison': num,
@@ -16,6 +17,7 @@ SaisonAvecEpisodes saison(int num, int nbEpisodes) =>
             'titre': null,
             'duree': 45,
             'date_diffusion': null,
+            'vu': i <= vus,
           }
       ],
     });
@@ -40,22 +42,31 @@ void main() {
   });
 
   group('progressionSerie', () {
-    final saisons = [saison(0, 3), saison(1, 10), saison(2, 8)];
-
     test('exclut les saisons spéciales du total', () {
-      final p = progressionSerie(saisons, prochain(1, 1));
+      final p = progressionSerie(
+          [saison(0, 3, vus: 3), saison(1, 10), saison(2, 8)]);
       expect(p.total, 18);
-      expect(p.vus, 0);
+      expect(p.vus, 0, reason: 'les épisodes spéciaux ne comptent pas');
     });
 
-    test('compte les épisodes avant le prochain', () {
-      final p = progressionSerie(saisons, prochain(2, 3));
-      expect(p.vus, 12); // saison 1 complète + 2 épisodes de la saison 2
+    test('compte les épisodes réellement vus', () {
+      final p = progressionSerie(
+          [saison(0, 3), saison(1, 10, vus: 10), saison(2, 8, vus: 2)]);
+      expect(p.vus, 12);
     });
 
-    test('prochain null = tout vu', () {
-      final p = progressionSerie(saisons, null);
+    test('tout vu', () {
+      final p = progressionSerie([saison(1, 10, vus: 10), saison(2, 8, vus: 8)]);
       expect(p.vus, 18);
+      expect(p.total, 18);
+    });
+
+    test('un trou au milieu ne se déduit plus des épisodes suivants', () {
+      // c'est le cas que l'ancienne déduction ratait : dé-marquer S1E5 alors
+      // que S1E6..E10 restent vus donnait « 4 vus », pas 9.
+      final saisons = [saison(1, 10, vus: 10)];
+      saisons.first.episodes[4].vu = false;
+      expect(progressionSerie(saisons).vus, 9);
     });
   });
 

@@ -36,6 +36,12 @@ class _RangeeUtilisateurState extends State<RangeeUtilisateur> {
     try {
       final chemin = '/utilisateurs/${u.idUtilisateur}/abonner';
       avant ? await api.delete(chemin) : await api.post(chemin);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(avant
+                ? 'Tu ne suis plus ${u.pseudo}'
+                : 'Tu suis ${u.pseudo} ✓')));
+      }
     } on ExceptionApi catch (e) {
       if (!mounted) return;
       setState(() => u.estAbonne = avant); // rollback

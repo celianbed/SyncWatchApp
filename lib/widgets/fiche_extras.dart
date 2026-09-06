@@ -54,6 +54,7 @@ class BlocNoterFiche extends StatefulWidget {
 
 class _BlocNoterFicheState extends State<BlocNoterFiche> {
   MonAvis? _avis; // mon avis sur cette cible, s'il existe
+  int? _note; // note affichée : posée avant la réponse du serveur
 
   @override
   void initState() {
@@ -72,13 +73,22 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
             (widget.idFilm != null && avis.idFilm == widget.idFilm);
         if (memeCible) trouve = avis;
       }
-      if (mounted) setState(() => _avis = trouve);
+      if (mounted) {
+        setState(() {
+          _avis = trouve;
+          _note = trouve?.note;
+        });
+      }
     } on ExceptionApi {
       // bloc silencieux : la fiche reste utilisable sans la note
     }
   }
 
+  /// Pose la note tout de suite, l'envoie derrière, et la remet comme elle
+  /// était si le serveur refuse.
   Future<void> _noter(int note) async {
+    final avant = _note;
+    setState(() => _note = note);
     try {
       final Map<String, dynamic> brut;
       if (_avis == null) {
@@ -91,12 +101,47 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
         brut = await api.patch('/avis/${_avis!.idAvis}',
             corps: {'note': note}) as Map<String, dynamic>;
       }
-      if (mounted) setState(() => _avis = MonAvis.depuisJson(brut));
+      if (mounted) {
+        final avis = MonAvis.depuisJson(brut);
+        setState(() {
+          _avis = avis;
+          _note = avis.note;
+        });
+      }
+      _message('Note enregistrée ✓');
+    } on ExceptionApi catch (e) {
+      if (mounted) setState(() => _note = avant);
+      _message(e.message);
+    }
+  }
+
+  /// Efface la note — une pastille touchée par erreur restait sinon définitive.
+  Future<void> _retirerNote() async {
+    final avis = _avis;
+    if (avis == null) return;
+    final avant = _note;
+    setState(() {
+      _note = null;
+      _avis = null;
+    });
+    try {
+      await api.delete('/avis/${avis.idAvis}');
+      _message('Note retirée');
     } on ExceptionApi catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        setState(() {
+          _note = avant;
+          _avis = avis;
+        });
       }
+      _message(e.message);
+    }
+  }
+
+  void _message(String texte) {
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(texte)));
     }
   }
 
@@ -119,7 +164,7 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
                   for (var note = 1; note <= 10; note++)
                     _PastilleNote(
                       note: note,
-                      active: _avis?.note == note,
+                      active: _note == note,
                       surTape: () {
                         Navigator.of(contexteFeuille).pop();
                         _noter(note);
@@ -127,6 +172,19 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
                     ),
                 ],
               ),
+              if (_avis != null) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(contexteFeuille).pop();
+                    _retirerNote();
+                  },
+                  icon: const Icon(Icons.delete_outline,
+                      size: 18, color: CouleursSW.danger),
+                  label: const Text('Retirer ma note',
+                      style: TextStyle(color: CouleursSW.danger)),
+                ),
+              ],
             ],
           ),
         ),
@@ -141,7 +199,7 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
         Expanded(
           child: _CarteNote(
             libelle: 'TA NOTE',
-            valeur: _avis?.note == null ? '?/10' : '${_avis!.note}/10',
+            valeur: _note == null ? '?/10' : '$_note/10',
             couleur: CouleursSW.accent,
             icone: Icons.star_rounded,
             surTape: _choisirNote,
