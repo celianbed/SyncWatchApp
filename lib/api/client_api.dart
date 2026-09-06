@@ -142,16 +142,28 @@ class ClientApi {
       _envoyer(() => _http.get(_uri(chemin, params), headers: _entetes),
           rejouable: true);
 
+  /// Incrémenté après chaque écriture réussie. Les écrans s'en servent pour
+  /// savoir s'ils sont périmés : recharger à chaque apparition coûterait des
+  /// allers-retours pour rien, alors que naviguer sans rien modifier est le
+  /// cas courant — et le serveur, sur une offre gratuite, se réveille lentement.
+  final revision = ValueNotifier<int>(0);
+
+  Future<dynamic> _ecrire(Future<http.Response> Function() requete) async {
+    final reponse = await _envoyer(requete);
+    revision.value++;
+    return reponse;
+  }
+
   Future<dynamic> post(String chemin, {Object? corps}) =>
-      _envoyer(() => _http.post(_uri(chemin),
+      _ecrire(() => _http.post(_uri(chemin),
           headers: _entetes, body: corps == null ? null : jsonEncode(corps)));
 
   Future<dynamic> patch(String chemin, {Object? corps}) =>
-      _envoyer(() => _http.patch(_uri(chemin),
+      _ecrire(() => _http.patch(_uri(chemin),
           headers: _entetes, body: corps == null ? null : jsonEncode(corps)));
 
   Future<dynamic> delete(String chemin) =>
-      _envoyer(() => _http.delete(_uri(chemin), headers: _entetes));
+      _ecrire(() => _http.delete(_uri(chemin), headers: _entetes));
 
   /// POST /auth/connexion — corps x-www-form-urlencoded imposé par la spec OAuth2.
   Future<String> connexion(String identifiant, String motDePasse) async {

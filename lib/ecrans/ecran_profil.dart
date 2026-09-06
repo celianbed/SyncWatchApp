@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/client_api.dart';
+import '../util/rafraichissement.dart';
 import '../api/session.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
@@ -25,13 +26,27 @@ const _moisPleins = [
 class EcranProfil extends StatefulWidget {
   /// Rappel pour basculer vers l'onglet Recherche (« Trouver des amis »).
   final VoidCallback? onOuvrirRecherche;
-  const EcranProfil({super.key, this.onOuvrirRecherche});
+  final bool actif;
+  const EcranProfil({super.key, this.actif = false, this.onOuvrirRecherche});
 
   @override
   State<EcranProfil> createState() => _EcranProfilState();
 }
 
-class _EcranProfilState extends State<EcranProfil> {
+class _EcranProfilState extends State<EcranProfil>
+    with RafraichitSiPerime {
+  @override
+  bool get visible => widget.actif;
+
+  @override
+  void rafraichir() => setState(_charger);
+
+  @override
+  void didUpdateWidget(EcranProfil ancien) {
+    super.didUpdateWidget(ancien);
+    if (widget.actif && !ancien.actif) rafraichirSiNecessaire();
+  }
+
   late Future<StatsGlobales> _stats;
   late Future<List<ResultatRecherche>> _favoris;
   late Future<List<ResultatRecherche>> _filmsVus;

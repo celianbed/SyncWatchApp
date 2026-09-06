@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../util/rafraichissement.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/format.dart';
@@ -11,13 +12,27 @@ import '../widgets/chargeur_async.dart';
 import 'ecran_fiche_serie.dart';
 
 class EcranCalendrier extends StatefulWidget {
-  const EcranCalendrier({super.key});
+    final bool actif;
+  const EcranCalendrier({super.key, this.actif = false});
 
   @override
   State<EcranCalendrier> createState() => _EcranCalendrierState();
 }
 
-class _EcranCalendrierState extends State<EcranCalendrier> {
+class _EcranCalendrierState extends State<EcranCalendrier>
+    with RafraichitSiPerime {
+  @override
+  bool get visible => widget.actif;
+
+  @override
+  void rafraichir() => _rafraichir();
+
+  @override
+  void didUpdateWidget(EcranCalendrier ancien) {
+    super.didUpdateWidget(ancien);
+    if (widget.actif && !ancien.actif) rafraichirSiNecessaire();
+  }
+
   late Future<List<CalendrierEntree>> _entrees;
 
   @override

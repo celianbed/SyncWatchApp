@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../util/rafraichissement.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/format.dart';
@@ -19,13 +20,29 @@ String _detailVisionnages(PeriodeStats p) {
 }
 
 class EcranStats extends StatefulWidget {
-  const EcranStats({super.key});
+    final bool actif;
+  const EcranStats({super.key, this.actif = false});
 
   @override
   State<EcranStats> createState() => _EcranStatsState();
 }
 
-class _EcranStatsState extends State<EcranStats> {
+class _EcranStatsState extends State<EcranStats>
+    with RafraichitSiPerime {
+  @override
+  bool get visible => widget.actif;
+
+  @override
+  void rafraichir() => setState(() {
+        _donnees = _charger();
+      });
+
+  @override
+  void didUpdateWidget(EcranStats ancien) {
+    super.didUpdateWidget(ancien);
+    if (widget.actif && !ancien.actif) rafraichirSiNecessaire();
+  }
+
   late Future<(StatsGlobales, List<PeriodeStats>)> _donnees;
 
   @override

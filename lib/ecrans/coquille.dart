@@ -25,13 +25,18 @@ class _CoquilleState extends State<Coquille> {
     return Scaffold(
       body: IndexedStack(
         index: _index,
+        // `actif` dit à chaque onglet s'il est à l'écran : l'IndexedStack les
+        // construit tous, mais n'en montre qu'un. Sans cette information, un
+        // onglet caché rechargerait ses données pour rien.
         children: [
-          const EcranAccueil(),
+          EcranAccueil(actif: _index == 0),
           EcranDecouverte(actif: _index == 1),
           const EcranRecherche(),
-          const EcranCalendrier(),
-          const EcranStats(),
-          EcranProfil(onOuvrirRecherche: () => setState(() => _index = 2)),
+          EcranCalendrier(actif: _index == 3),
+          EcranStats(actif: _index == 4),
+          EcranProfil(
+              actif: _index == 5,
+              onOuvrirRecherche: () => setState(() => _index = 2)),
         ],
       ),
       bottomNavigationBar: NavigationBar(

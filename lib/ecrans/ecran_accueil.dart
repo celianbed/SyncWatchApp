@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../util/rafraichissement.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
@@ -15,13 +16,29 @@ import 'ecran_liste_resultats.dart';
 import 'ecran_notifications.dart';
 
 class EcranAccueil extends StatefulWidget {
-  const EcranAccueil({super.key});
+    /// Onglet à l'écran ? La coquille les construit tous, n'en montre qu'un.
+  final bool actif;
+  const EcranAccueil({super.key, this.actif = false});
 
   @override
   State<EcranAccueil> createState() => _EcranAccueilState();
 }
 
-class _EcranAccueilState extends State<EcranAccueil> {
+class _EcranAccueilState extends State<EcranAccueil>
+    with RafraichitSiPerime {
+  @override
+  bool get visible => widget.actif;
+
+  @override
+  void rafraichir() => _rafraichir();
+
+  @override
+  void didUpdateWidget(EcranAccueil ancien) {
+    super.didUpdateWidget(ancien);
+    // l'onglet vient de revenir au premier plan
+    if (widget.actif && !ancien.actif) rafraichirSiNecessaire();
+  }
+
   late Future<List<AccueilEntree>> _entrees;
   late Future<List<ResultatRecherche>> _tendances;
   late Future<List<ResultatRecherche>> _seriesALAntenne;
