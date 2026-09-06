@@ -21,9 +21,10 @@ dependencies:
   google_fonts: ^6.2.1
   # Affiches TMDB avec cache disque
   cached_network_image: ^3.4.1
-  # Push notifications (Android) — nouvel épisode d'une série suivie
-  firebase_core: ^3.8.0
-  firebase_messaging: ^15.1.5
+  # Push notifications (iOS via APNs, et Android) — nouvel épisode,
+  # abonnement, recommandation
+  firebase_core: ^4.14.0
+  firebase_messaging: ^16.6.0
   # Connexion Google
   google_sign_in: ^6.2.2
   # Lecteur YouTube inline (feed de bandes-annonces « Extraits »)
