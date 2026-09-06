@@ -178,6 +178,24 @@ class AvisAmi {
         masque = json['masque'] as bool? ?? false;
 }
 
+/// Une tête d'affiche, telle que l'API la renvoie pour la personne connectée.
+class MembreCasting {
+  final int idActeur;
+  final String nom;
+  final String? photo;
+  final String? personnage;
+
+  /// Nombre d'AUTRES titres de mon historique où cette personne joue.
+  final int dejaVuDans;
+
+  MembreCasting.depuisJson(Map<String, dynamic> json)
+      : idActeur = json['id_acteur'] as int,
+        nom = json['nom'] as String,
+        photo = json['photo'] as String?,
+        personnage = json['personnage'] as String?,
+        dejaVuDans = json['deja_vu_dans'] as int? ?? 0;
+}
+
 class Genre {
   final String libelle;
   Genre.depuisJson(Map<String, dynamic> json)

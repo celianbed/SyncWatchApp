@@ -8,6 +8,7 @@ import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
 import '../widgets/avis_abonnements.dart';
+import '../widgets/section_casting.dart';
 import '../widgets/bouton_bande_annonce.dart';
 import '../widgets/feuille_recommander.dart';
 import '../widgets/fiche_extras.dart';
@@ -327,6 +328,8 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
                   Text(serie.synopsis!,
                       style: typo.bodySmall?.copyWith(height: 1.5)),
                 ],
+                SectionCasting(
+                    type: 'series', referenceTmdb: widget.referenceTmdb),
                 ProgressionAbonnements(referenceTmdb: widget.referenceTmdb),
                 AvisAbonnements(cle: 'id_serie', id: serie.idSerie),
                 SectionOuRegarder(plateformes: _plateformes),
