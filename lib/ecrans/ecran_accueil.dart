@@ -46,7 +46,8 @@ class _EcranAccueilState extends State<EcranAccueil>
   late Future<List<ResultatRecherche>> _filmsALAffiche;
 
   // Progressions par série (référence TMDB) — un seul appel saisons par série.
-  final _progressions = <int, Future<({int vus, int total})>>{};
+  final _valeurs = <int, ({int vus, int total})>{};
+  final _enCours = <int>{};
 
   // Épisodes qu'on vient de marquer vus. La carte reste en place, cochée :
   // la retirer la faisait disparaître puis revenir avec l'épisode suivant, un
@@ -87,7 +88,11 @@ class _EcranAccueilState extends State<EcranAccueil>
   /// la poser. Remplacer le Future d'abord ramenait le FutureBuilder à l'état
   /// « en attente », donc le squelette — d'où la série qui disparaissait, la
   /// page qui se rechargeait, puis la série qui revenait.
-  Future<void> _rafraichir() async {
+  /// [avecDecouverte] : les carrousels de tendances ne bougent qu'une fois par
+  /// semaine et n'ont aucun rapport avec un épisode coché. Les relancer les
+  /// renvoyait en chargement à chaque tic, ce qui donnait l'impression que
+  /// toute la page se rechargeait. Seul le tiré-pour-rafraîchir les redemande.
+  Future<void> _rafraichir({bool avecDecouverte = false}) async {
     final futur = _charger();
     List<AccueilEntree>? nouvelles;
     try {
@@ -99,7 +104,7 @@ class _EcranAccueilState extends State<EcranAccueil>
     if (!mounted) return;
     setState(() {
       _entrees = Future.value(nouvelles);
-      _chargerDecouverte();
+      if (avecDecouverte) _chargerDecouverte();
       // la liste rechargée fait autorité : elle porte déjà l'épisode suivant
       _marques.clear();
     });
@@ -107,27 +112,42 @@ class _EcranAccueilState extends State<EcranAccueil>
     marquerAJour();
   }
 
-  /// Décale la progression déjà connue de [delta] épisodes, sans rien
-  /// redemander au serveur. La liste rechargée corrigera si besoin.
+  /// Décale la progression connue de [delta] épisodes, sans rien redemander.
   void _avancerProgression(int referenceTmdb, int delta) {
-    final connue = _progressions[referenceTmdb];
+    final connue = _valeurs[referenceTmdb];
     if (connue == null) return;
-    _progressions[referenceTmdb] = connue.then((p) => (
-          vus: (p.vus + delta).clamp(0, p.total),
-          total: p.total,
-        ));
+    _valeurs[referenceTmdb] =
+        (vus: (connue.vus + delta).clamp(0, connue.total), total: connue.total);
   }
 
-  Future<({int vus, int total})> _progression(AccueilEntree entree) =>
-      _progressions.putIfAbsent(entree.serie.referenceTmdb, () async {
-        final donnees =
-            await api.get('/series/${entree.serie.referenceTmdb}/saisons') as List;
-        final saisons = [
-          for (final s in donnees)
-            SaisonAvecEpisodes.depuisJson(s as Map<String, dynamic>)
-        ];
-        return progressionSerie(saisons);
-      });
+  /// Progression connue, ou null tant qu'elle n'est pas arrivée.
+  ///
+  /// Une valeur, pas un Future : un FutureBuilder repart en attente dès qu'on
+  /// lui passe une nouvelle instance, et affichait alors zéro — la barre se
+  /// vidait sous les yeux à chaque épisode coché.
+  ({int vus, int total})? _progression(AccueilEntree entree) {
+    final ref = entree.serie.referenceTmdb;
+    final connue = _valeurs[ref];
+    if (connue != null) return connue;
+    if (_enCours.add(ref)) _chargerProgression(ref);
+    return null;
+  }
+
+  Future<void> _chargerProgression(int referenceTmdb) async {
+    try {
+      final donnees =
+          await api.get('/series/$referenceTmdb/saisons') as List;
+      final saisons = [
+        for (final s in donnees)
+          SaisonAvecEpisodes.depuisJson(s as Map<String, dynamic>)
+      ];
+      if (mounted) setState(() => _valeurs[referenceTmdb] = progressionSerie(saisons));
+    } on ExceptionApi {
+      // la barre reste vide : une progression manquante ne vaut pas une erreur
+    } finally {
+      _enCours.remove(referenceTmdb);
+    }
+  }
 
   /// Marque l'épisode vu : la carte disparaît immédiatement, l'appel part
   /// derrière, et la carte revient si le serveur refuse.
@@ -183,7 +203,8 @@ class _EcranAccueilState extends State<EcranAccueil>
     final typo = Theme.of(context).textTheme;
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: _rafraichir,
+        // geste explicite : c'est le seul cas où les tendances se redemandent
+        onRefresh: () => _rafraichir(avecDecouverte: true),
         child: FutureBuilder(
           future: _entrees,
           builder: (context, instantane) {
@@ -485,7 +506,8 @@ class _Pastille extends StatelessWidget {
 
 class _CarteEpisode extends StatelessWidget {
   final AccueilEntree entree;
-  final Future<({int vus, int total})> progression;
+  /// null tant que la progression n'est pas connue.
+  final ({int vus, int total})? progression;
   final VoidCallback surVu;
   final VoidCallback surOuvrir;
 
@@ -568,23 +590,24 @@ class _CarteEpisode extends StatelessWidget {
 }
 
 class _BarreProgression extends StatelessWidget {
-  final Future<({int vus, int total})> progression;
+  final ({int vus, int total})? progression;
   const _BarreProgression({required this.progression});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: progression,
-      builder: (context, instantane) {
-        final donnees = instantane.data;
-        final valeur = donnees == null || donnees.total == 0
-            ? 0.0
-            : donnees.vus / donnees.total;
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: LinearProgressIndicator(value: valeur, minHeight: 6),
-        );
-      },
+    final p = progression;
+    final valeur = p == null || p.total == 0 ? 0.0 : p.vus / p.total;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      // animée : cocher un épisode fait glisser la barre au lieu de sauter
+      child: TweenAnimationBuilder<double>(
+        // begin ne sert qu'au tout premier rendu ; ensuite l'animation part
+        // de la valeur courante vers le nouveau `end`.
+        tween: Tween<double>(begin: 0, end: valeur),
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+        builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 6),
+      ),
     );
   }
 }
