@@ -48,8 +48,9 @@ class _EcranAccueilState extends State<EcranAccueil>
   // Progressions par série (référence TMDB) — un seul appel saisons par série.
   final _progressions = <int, Future<({int vus, int total})>>{};
 
-  // Épisodes qu'on vient de marquer vus : retirés de la liste tout de suite,
-  // sans attendre le serveur. Vidé dès que la liste revient rechargée.
+  // Épisodes qu'on vient de marquer vus. La carte reste en place, cochée :
+  // la retirer la faisait disparaître puis revenir avec l'épisode suivant, un
+  // clignotement que rien ne justifie. Vidé quand la liste revient rechargée.
   final _marques = <int>{};
 
   @override
@@ -106,6 +107,17 @@ class _EcranAccueilState extends State<EcranAccueil>
     marquerAJour();
   }
 
+  /// Décale la progression déjà connue de [delta] épisodes, sans rien
+  /// redemander au serveur. La liste rechargée corrigera si besoin.
+  void _avancerProgression(int referenceTmdb, int delta) {
+    final connue = _progressions[referenceTmdb];
+    if (connue == null) return;
+    _progressions[referenceTmdb] = connue.then((p) => (
+          vus: (p.vus + delta).clamp(0, p.total),
+          total: p.total,
+        ));
+  }
+
   Future<({int vus, int total})> _progression(AccueilEntree entree) =>
       _progressions.putIfAbsent(entree.serie.referenceTmdb, () async {
         final donnees =
@@ -121,10 +133,10 @@ class _EcranAccueilState extends State<EcranAccueil>
   /// derrière, et la carte revient si le serveur refuse.
   Future<void> _marquerVu(AccueilEntree entree) async {
     final idEpisode = entree.episode.idEpisode;
-    // seule cette série a bougé : vider tout le cache de progression ferait
-    // repartir un appel /saisons par série, et les barres restaient longtemps
-    // en attente.
-    _progressions.remove(entree.serie.referenceTmdb);
+    // Un épisode de plus : on l'applique tout de suite. Oublier l'entrée du
+    // cache renvoyait la barre à zéro le temps d'un appel /saisons — elle se
+    // vidait sous les yeux avant de remonter.
+    _avancerProgression(entree.serie.referenceTmdb, 1);
     setState(() => _marques.add(idEpisode));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('${entree.serie.titre} ${entree.episode.code} marqué vu ✓'),
@@ -146,7 +158,7 @@ class _EcranAccueilState extends State<EcranAccueil>
   /// Défait le marquage sur simple pression de « Annuler ».
   Future<void> _annulerVu(AccueilEntree entree) async {
     try {
-      _progressions.remove(entree.serie.referenceTmdb);
+      _avancerProgression(entree.serie.referenceTmdb, -1);
       await api.delete('/episodes/${entree.episode.idEpisode}/vu');
       _message('${entree.episode.code} remis en non vu');
     } on ExceptionApi catch (e) {
@@ -184,10 +196,7 @@ class _EcranAccueilState extends State<EcranAccueil>
                   texte: 'API injoignable.\n${instantane.error}',
                   surReessayer: _rafraichir);
             }
-            final entrees = [
-              for (final e in instantane.data ?? <AccueilEntree>[])
-                if (!_marques.contains(e.episode.idEpisode)) e
-            ];
+            final entrees = instantane.data ?? <AccueilEntree>[];
             return ListView(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               children: [
@@ -223,6 +232,7 @@ class _EcranAccueilState extends State<EcranAccueil>
                     _CarteEpisode(
                         entree: entree,
                         progression: _progression(entree),
+                        vu: _marques.contains(entree.episode.idEpisode),
                         surVu: () => _marquerVu(entree),
                         surOuvrir: () => _ouvrirSerie(entree)),
                     const SizedBox(height: 12),
@@ -479,9 +489,14 @@ class _CarteEpisode extends StatelessWidget {
   final VoidCallback surVu;
   final VoidCallback surOuvrir;
 
+  /// Épisode validé, en attente de la liste rechargée : la carte reste en
+  /// place, cochée, plutôt que de disparaître puis revenir.
+  final bool vu;
+
   const _CarteEpisode(
       {required this.entree,
       required this.progression,
+      required this.vu,
       required this.surVu,
       required this.surOuvrir});
 
@@ -543,7 +558,7 @@ class _CarteEpisode extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              _BoutonVu(surVu: surVu),
+              _BoutonVu(surVu: vu ? null : surVu, vu: vu),
             ],
           ),
         ),
@@ -575,21 +590,27 @@ class _BarreProgression extends StatelessWidget {
 }
 
 class _BoutonVu extends StatelessWidget {
-  final VoidCallback surVu;
-  const _BoutonVu({required this.surVu});
+  final VoidCallback? surVu;
+  final bool vu;
+  const _BoutonVu({required this.surVu, required this.vu});
 
   @override
   Widget build(BuildContext context) {
+    // validé : pastille pleine, coche blanche. Le retour est immédiat, sans
+    // faire disparaître la carte — la liste rechargée y posera l'épisode suivant.
     return Material(
-      color: CouleursSW.succes.withValues(alpha: .15),
+      color: vu
+          ? CouleursSW.succes
+          : CouleursSW.succes.withValues(alpha: .15),
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: surVu,
-        child: const SizedBox(
+        child: SizedBox(
           width: 36,
           height: 36,
-          child: Icon(Icons.check, color: CouleursSW.succes, size: 20),
+          child: Icon(vu ? Icons.check_rounded : Icons.check,
+              color: vu ? Colors.white : CouleursSW.succes, size: 20),
         ),
       ),
     );
