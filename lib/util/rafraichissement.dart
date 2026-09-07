@@ -54,6 +54,11 @@ mixin RafraichitSiPerime<T extends StatefulWidget> on State<T> {
     rafraichir();
   }
 
+  /// À appeler juste avant une écriture dont l'écran applique déjà l'effet
+  /// lui-même. Sans ça, sa révision déclencherait un rechargement complet
+  /// alors que l'affichage est déjà juste.
+  void ignorerProchaineEcriture() => _revisionVue = api.revision.value + 1;
+
   /// À appeler après un rechargement déclenché autrement (tiré pour
   /// rafraîchir), pour ne pas recharger une seconde fois juste après.
   void marquerAJour() {

@@ -45,9 +45,16 @@ class _EcranAccueilState extends State<EcranAccueil>
   late Future<List<ResultatRecherche>> _seriesALAntenne;
   late Future<List<ResultatRecherche>> _filmsALAffiche;
 
-  // Progressions par série (référence TMDB) — un seul appel saisons par série.
-  final _valeurs = <int, ({int vus, int total})>{};
+  // Saisons par série (référence TMDB) — un seul appel /saisons par série.
+  // On garde la liste entière, pas seulement la progression qu'on en tire :
+  // elle porte l'état vu de chaque épisode, donc de quoi calculer le prochain
+  // localement et se passer d'un aller-retour à chaque épisode coché.
+  final _saisons = <int, List<SaisonAvecEpisodes>>{};
   final _enCours = <int>{};
+
+  // Prochain épisode recalculé sur place après un cochage. null = série
+  // terminée, sa carte disparaît.
+  final _prochainLocal = <int, ProchainEpisode?>{};
 
   // Épisodes qu'on vient de marquer vus. La carte reste en place, cochée :
   // la retirer la faisait disparaître puis revenir avec l'épisode suivant, un
@@ -112,36 +119,39 @@ class _EcranAccueilState extends State<EcranAccueil>
     marquerAJour();
   }
 
-  /// Décale la progression connue de [delta] épisodes, sans rien redemander.
-  void _avancerProgression(int referenceTmdb, int delta) {
-    final connue = _valeurs[referenceTmdb];
-    if (connue == null) return;
-    _valeurs[referenceTmdb] =
-        (vus: (connue.vus + delta).clamp(0, connue.total), total: connue.total);
+  /// L'entrée telle qu'elle doit s'afficher : avec le prochain épisode
+  /// recalculé localement s'il y en a un, ou null si la série n'a plus rien
+  /// à proposer ce soir.
+  AccueilEntree? _avecProchainLocal(AccueilEntree entree) {
+    final ref = entree.serie.referenceTmdb;
+    if (!_prochainLocal.containsKey(ref)) return entree;
+    final prochain = _prochainLocal[ref];
+    return prochain == null
+        ? null
+        : AccueilEntree(serie: entree.serie, episode: prochain);
   }
 
-  /// Progression connue, ou null tant qu'elle n'est pas arrivée.
+  /// Progression connue, ou null tant que les saisons ne sont pas arrivées.
   ///
   /// Une valeur, pas un Future : un FutureBuilder repart en attente dès qu'on
-  /// lui passe une nouvelle instance, et affichait alors zéro — la barre se
+  /// lui passe une nouvelle instance, et affiche alors zéro — la barre se
   /// vidait sous les yeux à chaque épisode coché.
   ({int vus, int total})? _progression(AccueilEntree entree) {
     final ref = entree.serie.referenceTmdb;
-    final connue = _valeurs[ref];
-    if (connue != null) return connue;
-    if (_enCours.add(ref)) _chargerProgression(ref);
+    final saisons = _saisons[ref];
+    if (saisons != null) return progressionSerie(saisons);
+    if (_enCours.add(ref)) _chargerSaisons(ref);
     return null;
   }
 
-  Future<void> _chargerProgression(int referenceTmdb) async {
+  Future<void> _chargerSaisons(int referenceTmdb) async {
     try {
-      final donnees =
-          await api.get('/series/$referenceTmdb/saisons') as List;
+      final donnees = await api.get('/series/$referenceTmdb/saisons') as List;
       final saisons = [
         for (final s in donnees)
           SaisonAvecEpisodes.depuisJson(s as Map<String, dynamic>)
       ];
-      if (mounted) setState(() => _valeurs[referenceTmdb] = progressionSerie(saisons));
+      if (mounted) setState(() => _saisons[referenceTmdb] = saisons);
     } on ExceptionApi {
       // la barre reste vide : une progression manquante ne vaut pas une erreur
     } finally {
@@ -149,48 +159,81 @@ class _EcranAccueilState extends State<EcranAccueil>
     }
   }
 
-  /// Marque l'épisode vu : la carte disparaît immédiatement, l'appel part
-  /// derrière, et la carte revient si le serveur refuse.
+  /// Applique le cochage sur le cache local : l'épisode passe vu, et le
+  /// prochain est recalculé sur place. Renvoie faux si les saisons ne sont pas
+  /// encore chargées — il faudra alors s'en remettre au serveur.
+  bool _appliquerLocalement(AccueilEntree entree, int idEpisode, bool vu) {
+    final saisons = _saisons[entree.serie.referenceTmdb];
+    if (saisons == null) return false;
+    for (final saison in saisons) {
+      for (final episode in saison.episodes) {
+        if (episode.idEpisode == idEpisode) {
+          episode.vu = vu;
+          _prochainLocal[entree.serie.referenceTmdb] = prochainNonVu(saisons);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Marque l'épisode vu. Barre et carte avancent sur-le-champ, l'appel part
+  /// derrière, et l'écran ne se recharge qu'en cas de refus du serveur.
+  ///
+  /// Les saisons déjà en cache portent l'état vu de chaque épisode : le
+  /// prochain se calcule donc localement, sans le moindre aller-retour. C'est
+  /// ce qui manquait — je croyais devoir demander au serveur quel épisode
+  /// afficher ensuite, d'où un rechargement à chaque tic.
   Future<void> _marquerVu(AccueilEntree entree) async {
     final idEpisode = entree.episode.idEpisode;
-    // Un épisode de plus : on l'applique tout de suite. Oublier l'entrée du
-    // cache renvoyait la barre à zéro le temps d'un appel /saisons — elle se
-    // vidait sous les yeux avant de remonter.
-    _avancerProgression(entree.serie.referenceTmdb, 1);
-    setState(() => _marques.add(idEpisode));
+    final localement = _appliquerLocalement(entree, idEpisode, true);
+    setState(() {
+      if (!localement) _marques.add(idEpisode); // repli : on coche la carte
+    });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('${entree.serie.titre} ${entree.episode.code} marqué vu ✓'),
       action: SnackBarAction(
           label: 'Annuler', onPressed: () => _annulerVu(entree)),
     ));
+
+    // l'affichage est déjà juste : inutile que la révision le refasse
+    if (localement) ignorerProchaineEcriture();
     try {
-      // pas de rechargement explicite : l'écriture fait bouger la révision,
-      // qui déclenche déjà `rafraichir()`. En demander un second ici en
-      // provoquait deux — la série disparaissait, revenait, disparaissait.
       await api.post('/episodes/$idEpisode/vu');
     } on ExceptionApi catch (e) {
       if (!mounted) return;
-      setState(() => _marques.remove(idEpisode));
-      _message(e.message);
+      // le serveur a refusé : on remet l'écran dans l'état d'avant
+      setState(() {
+        _appliquerLocalement(entree, idEpisode, false);
+        _marques.remove(idEpisode);
+      });
+      _message(e.message, remplace: true);
     }
   }
 
   /// Défait le marquage sur simple pression de « Annuler ».
   Future<void> _annulerVu(AccueilEntree entree) async {
+    final idEpisode = entree.episode.idEpisode;
+    final localement = _appliquerLocalement(entree, idEpisode, false);
+    if (mounted) setState(() => _marques.remove(idEpisode));
+    if (localement) ignorerProchaineEcriture();
     try {
-      _avancerProgression(entree.serie.referenceTmdb, -1);
-      await api.delete('/episodes/${entree.episode.idEpisode}/vu');
+      await api.delete('/episodes/$idEpisode/vu');
       _message('${entree.episode.code} remis en non vu');
     } on ExceptionApi catch (e) {
+      if (mounted) setState(() => _appliquerLocalement(entree, idEpisode, true));
       _message(e.message);
     }
   }
 
-  void _message(String texte) {
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(texte)));
-    }
+  /// [remplace] : vide la file d'attente avant d'afficher. Un refus du serveur
+  /// arrivait sinon quatre secondes après la confirmation « marqué vu ✓ », qui
+  /// occupait encore l'écran — on lisait une confirmation, puis son démenti.
+  void _message(String texte, {bool remplace = false}) {
+    if (!mounted) return;
+    final messager = ScaffoldMessenger.of(context);
+    if (remplace) messager.clearSnackBars();
+    messager.showSnackBar(SnackBar(content: Text(texte)));
   }
 
   String _salutation() {
@@ -217,7 +260,13 @@ class _EcranAccueilState extends State<EcranAccueil>
                   texte: 'API injoignable.\n${instantane.error}',
                   surReessayer: _rafraichir);
             }
-            final entrees = instantane.data ?? <AccueilEntree>[];
+            // Le prochain épisode recalculé sur place prime sur celui que le
+            // serveur avait envoyé ; une série dont tout le diffusé est vu
+            // quitte la liste, exactement comme le ferait l'API.
+            final entrees = [
+              for (final e in instantane.data ?? <AccueilEntree>[])
+                ?_avecProchainLocal(e)
+            ];
             return ListView(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               children: [

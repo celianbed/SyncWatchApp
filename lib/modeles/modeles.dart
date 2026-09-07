@@ -243,14 +243,42 @@ class ProchainEpisode {
         vignette = json['vignette'] as String?,
         dejaDiffuse = json['deja_diffuse'] as bool;
 
+  /// Construit l'entrée depuis les saisons déjà en cache, pour avancer d'un
+  /// épisode sans redemander au serveur. La vignette manque — `saisons` ne la
+  /// porte pas — et la carte retombe alors sur l'affiche de la série.
+  ProchainEpisode.local(EpisodeDansSaison episode, int saison)
+      : idEpisode = episode.idEpisode,
+        numSaison = saison,
+        numEpisode = episode.numEpisode,
+        titre = episode.titre,
+        duree = episode.duree,
+        dateDiffusion = episode.dateDiffusion,
+        vignette = null,
+        dejaDiffuse = episode.diffuse;
+
   /// « S03E05 »
   String get code =>
       'S${numSaison.toString().padLeft(2, '0')}E${numEpisode.toString().padLeft(2, '0')}';
 }
 
+/// Premier épisode diffusé et non vu, saisons spéciales exclues — la même
+/// règle que l'API applique pour l'accueil, appliquée ici sur le cache local.
+ProchainEpisode? prochainNonVu(List<SaisonAvecEpisodes> saisons) {
+  for (final saison in saisons.where((s) => s.numSaison > 0)) {
+    for (final episode in saison.episodes) {
+      if (!episode.vu && episode.diffuse) {
+        return ProchainEpisode.local(episode, saison.numSaison);
+      }
+    }
+  }
+  return null; // tout le diffusé est vu : la série sort de l'accueil
+}
+
 class AccueilEntree {
   final SerieResume serie;
   final ProchainEpisode episode;
+
+  const AccueilEntree({required this.serie, required this.episode});
 
   AccueilEntree.depuisJson(Map<String, dynamic> json)
       : serie = SerieResume.depuisJson(json['serie'] as Map<String, dynamic>),
