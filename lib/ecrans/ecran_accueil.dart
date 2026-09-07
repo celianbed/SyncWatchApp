@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../api/client_api.dart';
 import '../widgets/squelette.dart';
 import '../util/rafraichissement.dart';
+import '../util/snack.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
@@ -190,11 +191,12 @@ class _EcranAccueilState extends State<EcranAccueil>
     setState(() {
       if (!localement) _marques.add(idEpisode); // repli : on coche la carte
     });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${entree.serie.titre} ${entree.episode.code} marqué vu ✓'),
-      action: SnackBarAction(
-          label: 'Annuler', onPressed: () => _annulerVu(entree)),
-    ));
+    afficherAnnulable(
+      ScaffoldMessenger.of(context),
+      texte: '${entree.serie.titre} ${entree.episode.code} marqué vu ✓',
+      libelleAction: 'Annuler',
+      surAction: () => _annulerVu(entree),
+    );
 
     // l'affichage est déjà juste : inutile que la révision le refasse
     if (localement) ignorerProchaineEcriture();

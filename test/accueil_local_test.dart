@@ -155,4 +155,24 @@ void main() {
         reason: 'retour à l\'épisode d\'avant');
     expect(find.text('Épisode introuvable.'), findsOneWidget);
   });
+
+  testWidgets('la confirmation s\'efface d\'elle-même', (tester) async {
+    final faux = ApiAccueil();
+    await ouvrir(tester, faux);
+
+    await tester.tap(find.byIcon(Icons.check));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.widgetWithText(SnackBar, 'Annuler'), findsOneWidget);
+    // le bouton n'est pas dans `action:` — voir util/snack.dart : une SnackBar
+    // qui en porte un ne se referme jamais seule dans cette version de Flutter
+    expect(find.byType(SnackBarAction), findsNothing);
+
+    // durée par défaut d'une SnackBar : 4 s, plus l'animation de sortie
+    for (var i = 0; i < 60; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(find.byType(SnackBar), findsNothing,
+        reason: 'elle doit disparaître seule, sans geste de l\'utilisateur');
+  });
 }
