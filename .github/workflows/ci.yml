@@ -11,8 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Version épinglée, comme la CI de l'API épingle Python. Sans ça, la CI
+      # installe la dernière stable du jour : elle valide donc un outillage
+      # avec lequel vous ne compilez pas, et casse toute seule à chaque
+      # nouvelle version — nouveaux diagnostics de l'analyseur, API retirées.
+      # À monter délibérément, en vérifiant `flutter analyze` en local d'abord.
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: 3.41.8
           channel: stable
           cache: true
 
