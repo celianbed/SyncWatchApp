@@ -244,8 +244,7 @@ class ProchainEpisode {
         dejaDiffuse = json['deja_diffuse'] as bool;
 
   /// Construit l'entrée depuis les saisons déjà en cache, pour avancer d'un
-  /// épisode sans redemander au serveur. La vignette manque — `saisons` ne la
-  /// porte pas — et la carte retombe alors sur l'affiche de la série.
+  /// épisode sans redemander au serveur — vignette comprise.
   ProchainEpisode.local(EpisodeDansSaison episode, int saison)
       : idEpisode = episode.idEpisode,
         numSaison = saison,
@@ -253,7 +252,7 @@ class ProchainEpisode {
         titre = episode.titre,
         duree = episode.duree,
         dateDiffusion = episode.dateDiffusion,
-        vignette = null,
+        vignette = episode.vignette,
         dejaDiffuse = episode.diffuse;
 
   /// « S03E05 »
@@ -426,6 +425,11 @@ class EpisodeDansSaison {
   final int? duree;
   final DateTime? dateDiffusion;
 
+  /// Image de l'épisode. L'API la renvoie depuis toujours dans /saisons ;
+  /// sans elle, la carte de l'accueil retombait sur l'affiche de la série
+  /// dès qu'on cochait un épisode.
+  final String? vignette;
+
   /// Vu par moi. Mutable : les bascules de la fiche l'écrivent avant la
   /// réponse du serveur, et la remettent en place si l'appel échoue.
   bool vu;
@@ -436,6 +440,7 @@ class EpisodeDansSaison {
         titre = json['titre'] as String?,
         duree = json['duree'] as int?,
         dateDiffusion = _date(json['date_diffusion']),
+        vignette = json['vignette'] as String?,
         vu = json['vu'] as bool? ?? false;
 
   /// Un épisode non encore diffusé ne se marque pas vu.

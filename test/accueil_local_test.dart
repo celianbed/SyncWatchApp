@@ -5,6 +5,7 @@
 // serveur quel épisode afficher ensuite alors que je le savais déjà.
 import 'dart:convert';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -25,6 +26,7 @@ class ApiAccueil {
         'titre': 'Épisode $num',
         'duree': 50,
         'date_diffusion': '2011-04-17',
+        'vignette': '/episode$num.jpg',
         'vu': vu,
       };
 
@@ -109,6 +111,21 @@ void main() {
         reason: 'le prochain épisode vient du cache local');
     expect(faux.appels, ['POST /episodes/101/vu'],
         reason: 'une seule écriture, aucun rechargement');
+  });
+
+  testWidgets('l\'épisode suivant garde sa vignette', (tester) async {
+    // elle vient de /saisons, que l'API renvoie depuis toujours : sans la
+    // lire, la carte retombait sur l'affiche de la série après un cochage
+    final faux = ApiAccueil();
+    await ouvrir(tester, faux);
+
+    await tester.tap(find.byIcon(Icons.check));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    final images = tester
+        .widgetList<CachedNetworkImage>(find.byType(CachedNetworkImage))
+        .map((i) => i.imageUrl);
+    expect(images.any((url) => url.contains('episode2.jpg')), isTrue);
   });
 
   testWidgets('la dernière série cochée quitte la liste', (tester) async {
