@@ -412,9 +412,12 @@ class _MaquetteNotification extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('SyncWatch',
+                      // w600 : seul Inter-SemiBold est embarqué, pas Bold.
+                      // À 8 px la différence ne se voit pas, et embarquer une
+                      // troisième variante pour ça alourdirait l'app.
                       style: GoogleFonts.inter(
                           fontSize: 8,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           color: CouleursSW.texte)),
                   const SizedBox(height: 3),
                   const _Barre(largeur: 104, hauteur: 5, attenuee: true),
@@ -567,7 +570,7 @@ class _Etiquette extends StatelessWidget {
     return Text(texte,
         style: GoogleFonts.inter(
             fontSize: 7.5,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600, // Inter-Bold n'est pas embarqué
             letterSpacing: .9,
             color: CouleursSW.texteSecondaire));
   }
