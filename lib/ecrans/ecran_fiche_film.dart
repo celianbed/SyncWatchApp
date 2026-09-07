@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/format.dart';
@@ -149,7 +150,7 @@ class _EcranFicheFilmState extends State<EcranFicheFilm> {
         future: _film,
         builder: (context, instantane) {
           if (instantane.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AvecMentionReveil(child: SqueletteFiche());
           }
           if (instantane.hasError) {
             return Center(

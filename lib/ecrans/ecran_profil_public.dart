@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/avatar_utilisateur.dart';
@@ -109,6 +110,7 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
       appBar: AppBar(actions: [_menuModeration()]),
       body: ChargeurAsync<ProfilPublic>(
         future: _profil,
+        squelette: const SqueletteListe(nombre: 5),
         surReessayer: () => setState(() => _profil = _chargerProfil()),
         enfant: _contenu,
       ),

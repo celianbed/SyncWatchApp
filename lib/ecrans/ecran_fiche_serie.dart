@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
@@ -66,6 +67,17 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
 
   /// [silencieux] : rafraîchit les données SANS afficher le spinner plein écran
   /// (utilisé après une action optimiste — le contenu se met à jour en place).
+  /// Exécute [appel] en traitant un 404 comme une absence, pas comme une
+  /// erreur — les autres codes remontent normalement.
+  static Future<dynamic> _sauf404(Future<dynamic> Function() appel) async {
+    try {
+      return await appel();
+    } on ExceptionApi catch (e) {
+      if (e.code == 404) return null;
+      rethrow;
+    }
+  }
+
   Future<void> _charger({bool silencieux = false}) async {
     if (!silencieux) {
       setState(() {
@@ -74,32 +86,29 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
       });
     }
     try {
-      final serie = SeriePublique.depuisJson(
-          await api.get('/series/${widget.referenceTmdb}')
-              as Map<String, dynamic>);
-
-      // Saisons, prochain épisode et suivi : absents tant que personne ne suit
-      // la série (cache non rempli) — un 404 ici est un état normal.
-      var saisons = <SaisonAvecEpisodes>[];
-      SuiviPublic? suivi;
-      try {
-        final donnees =
-            await api.get('/series/${widget.referenceTmdb}/saisons') as List;
-        saisons = [
-          for (final s in donnees)
-            SaisonAvecEpisodes.depuisJson(s as Map<String, dynamic>)
-        ];
-      } on ExceptionApi catch (e) {
-        if (e.code != 404) rethrow;
-      }
-      try {
+      // Les trois appels sont indépendants : les enchaîner coûtait trois
+      // allers-retours bout à bout là où un seul temps d'attente suffit.
+      //
+      // Saisons et suivi sont absents tant que personne ne suit la série (le
+      // cache n'est pas rempli) : un 404 y est un état normal, pas une panne,
+      // d'où le repli sur null plutôt qu'une exception.
+      final resultats = await Future.wait([
+        api.get('/series/${widget.referenceTmdb}'),
+        _sauf404(() => api.get('/series/${widget.referenceTmdb}/saisons')),
         // PATCH vide : renvoie le suivi actuel sans le modifier, 404 sinon.
-        suivi = SuiviPublic.depuisJson(
-            await api.patch('/series/${widget.referenceTmdb}/suivre',
-                corps: const {}) as Map<String, dynamic>);
-      } on ExceptionApi catch (e) {
-        if (e.code != 404) rethrow;
-      }
+        _sauf404(() => api.patch('/series/${widget.referenceTmdb}/suivre',
+            corps: const {})),
+      ]);
+
+      final serie =
+          SeriePublique.depuisJson(resultats[0] as Map<String, dynamic>);
+      final saisons = [
+        for (final s in (resultats[1] as List? ?? const []))
+          SaisonAvecEpisodes.depuisJson(s as Map<String, dynamic>)
+      ];
+      final suivi = resultats[2] == null
+          ? null
+          : SuiviPublic.depuisJson(resultats[2] as Map<String, dynamic>);
 
       if (!mounted) return;
       setState(() {
@@ -233,7 +242,10 @@ class _EcranFicheSerieState extends State<EcranFicheSerie> {
   @override
   Widget build(BuildContext context) {
     if (_chargement) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      // l'ossature reprend la géométrie de la fiche : le contenu s'installe
+      // là où elle l'annonçait, sans sursaut de mise en page
+      return const Scaffold(
+          body: AvecMentionReveil(child: SqueletteFiche()));
     }
     if (_erreur != null || _serie == null) {
       return Scaffold(

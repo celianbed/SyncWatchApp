@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/affiche_tmdb.dart';
@@ -133,7 +134,7 @@ class _EcranRechercheState extends State<EcranRecherche> {
   }
 
   Widget _corpsUsers() {
-    if (_chargement) return const Center(child: CircularProgressIndicator());
+    if (_chargement) return const SqueletteListe(nombre: 6, hauteur: 72);
     if (_users == null) {
       return const _Indication(
           icone: Icons.group_outlined,
@@ -160,7 +161,7 @@ class _EcranRechercheState extends State<EcranRecherche> {
   }
 
   Widget _corpsTitres(List<ResultatRecherche> filtres) {
-    if (_chargement) return const Center(child: CircularProgressIndicator());
+    if (_chargement) return const SqueletteListe(nombre: 6, hauteur: 72);
     if (_resultats == null) {
       return const _Indication(
           icone: Icons.local_movies_outlined,

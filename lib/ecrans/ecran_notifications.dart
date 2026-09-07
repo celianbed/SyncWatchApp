@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../util/format.dart';
@@ -97,7 +98,7 @@ class _EcranNotificationsState extends State<EcranNotifications> {
                   child: Text(_erreur!,
                       style: typo.bodySmall, textAlign: TextAlign.center)))
           : notifications == null
-              ? const Center(child: CircularProgressIndicator())
+              ? const SqueletteListe(nombre: 6, hauteur: 64)
               : notifications.isEmpty
                   ? Center(
                       child: Column(

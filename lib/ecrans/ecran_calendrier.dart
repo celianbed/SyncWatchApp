@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../util/rafraichissement.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
@@ -83,6 +84,7 @@ class _EcranCalendrierState extends State<EcranCalendrier>
         onRefresh: _rafraichir,
         child: ChargeurAsync<List<CalendrierEntree>>(
           future: _entrees,
+          squelette: const SqueletteListe(nombre: 5),
           surReessayer: _rafraichir,
           enfant: (donnees) {
             final groupes = _parJour(donnees);

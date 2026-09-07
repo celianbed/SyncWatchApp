@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/chargeur_async.dart';
@@ -80,6 +81,7 @@ class _EcranCommunauteState extends State<EcranCommunaute> {
           Expanded(
             child: ChargeurAsync<List<ResumeUtilisateur>>(
               future: _abonnesActif ? _abonnes : _abonnements,
+              squelette: const SqueletteListe(nombre: 6, hauteur: 64),
               enfant: (liste) {
                 if (liste.isEmpty) {
                   return Center(

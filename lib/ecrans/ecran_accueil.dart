@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../util/rafraichissement.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
@@ -156,7 +157,7 @@ class _EcranAccueilState extends State<EcranAccueil>
           future: _entrees,
           builder: (context, instantane) {
             if (instantane.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const AvecMentionReveil(child: SqueletteListe());
             }
             if (instantane.hasError) {
               return _MessageCentre(

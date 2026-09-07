@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
 import '../widgets/avatar_utilisateur.dart';
@@ -55,6 +56,7 @@ class _EcranActiviteState extends State<EcranActivite> {
         onRefresh: _rafraichir,
         child: ChargeurAsync<List<EvenementActivite>>(
           future: _fil,
+          squelette: const SqueletteListe(nombre: 6, hauteur: 64),
           surReessayer: _rafraichir,
           enfant: (fil) {
             if (fil.isEmpty) return const _Vide();

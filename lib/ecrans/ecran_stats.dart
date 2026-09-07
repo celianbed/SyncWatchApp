@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
+import '../widgets/squelette.dart';
 import '../util/rafraichissement.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
@@ -114,6 +115,7 @@ class _EcranStatsState extends State<EcranStats>
         onRefresh: _rafraichir,
         child: ChargeurAsync<(StatsGlobales, List<PeriodeStats>)>(
           future: _donnees,
+          squelette: const SqueletteListe(nombre: 4, hauteur: 96),
           surReessayer: _rafraichir,
           enfant: (donnees) {
             final (stats, historique) = donnees;

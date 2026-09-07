@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/client_api.dart';
+import 'squelette.dart';
 import '../api/session.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
@@ -77,6 +78,7 @@ class _FeuilleRecommanderState extends State<_FeuilleRecommander> {
                   maxHeight: MediaQuery.of(context).size.height * 0.5),
               child: ChargeurAsync<List<ResumeUtilisateur>>(
                 future: _amis,
+                squelette: const SqueletteListe(nombre: 4, hauteur: 56),
                 enfant: (amis) {
                   if (amis.isEmpty) {
                     return Padding(

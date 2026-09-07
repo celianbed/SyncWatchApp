@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../api/client_api.dart';
 import '../theme.dart';
+import 'squelette.dart';
 
 class ChargeurAsync<T> extends StatelessWidget {
   final Future<T> future;
@@ -13,11 +14,17 @@ class ChargeurAsync<T> extends StatelessWidget {
   /// Optionnel : affiche un bouton « Réessayer » qui déclenche ce rappel.
   final VoidCallback? surReessayer;
 
+  /// Ossature affichée pendant le chargement. Sans elle, on retombe sur le
+  /// disque qui tourne — acceptable pour une attente courte et centrée, mais
+  /// un squelette vaut mieux dès qu'une page entière se construit.
+  final Widget? squelette;
+
   const ChargeurAsync({
     super.key,
     required this.future,
     required this.enfant,
     this.surReessayer,
+    this.squelette,
   });
 
   @override
@@ -26,7 +33,10 @@ class ChargeurAsync<T> extends StatelessWidget {
       future: future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const _Attente();
+          final ossature = squelette;
+          return ossature == null
+              ? const _Attente()
+              : AvecMentionReveil(child: ossature);
         }
         if (snap.hasError) {
           return _Erreur(
