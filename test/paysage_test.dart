@@ -4,7 +4,6 @@
 // dessiné pour : bandeaux de 230 px, cadre de téléphone de l'onboarding,
 // grilles d'affiches. L'app est donc verrouillée en portrait, et seul le feed
 // le déverrouille — le temps de passer une bande-annonce en grand.
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
