@@ -104,6 +104,25 @@ void main() {
     expect(_EcranState.rechargements, 1);
   });
 
+  testWidgets('l\'enregistrement du jeton de notification ne périme rien',
+      (tester) async {
+    // il part à la connexion, juste après le premier chargement de l'accueil :
+    // le compter faisait recharger l'écran une seconde fois au démarrage
+    await monter(tester, actif: true);
+    await api.post('/appareils', corps: {'jeton_notif': 'x', 'plateforme': 'ios'});
+    await tester.pump();
+
+    expect(_EcranState.rechargements, 0);
+  });
+
+  testWidgets('la connexion non plus', (tester) async {
+    await monter(tester, actif: true);
+    await api.post('/auth/apple', corps: {'identity_token': 'x'});
+    await tester.pump();
+
+    expect(_EcranState.rechargements, 0);
+  });
+
   testWidgets('une écriture échouée ne périme rien', (tester) async {
     api = ClientApi(client: MockClient((_) async =>
         http.Response('{"detail":"non"}', 400,

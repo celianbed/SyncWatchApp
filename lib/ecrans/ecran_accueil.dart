@@ -82,15 +82,28 @@ class _EcranAccueilState extends State<EcranAccueil>
     _filmsALAffiche = _chargerResultats('/search/nouveautes', {'type': 'film'});
   }
 
+  /// Recharge sans blanchir l'écran : on attend la nouvelle liste avant de
+  /// la poser. Remplacer le Future d'abord ramenait le FutureBuilder à l'état
+  /// « en attente », donc le squelette — d'où la série qui disparaissait, la
+  /// page qui se rechargeait, puis la série qui revenait.
   Future<void> _rafraichir() async {
-    _progressions.clear();
+    final futur = _charger();
+    List<AccueilEntree>? nouvelles;
+    try {
+      nouvelles = await futur;
+    } on ExceptionApi {
+      if (mounted) setState(() => _entrees = futur); // laisse voir l'erreur
+      return;
+    }
+    if (!mounted) return;
     setState(() {
-      _entrees = _charger();
+      _entrees = Future.value(nouvelles);
       _chargerDecouverte();
+      // la liste rechargée fait autorité : elle porte déjà l'épisode suivant
+      _marques.clear();
     });
-    await _entrees;
-    // la liste rechargée fait autorité : elle porte déjà l'épisode suivant
-    if (mounted) setState(_marques.clear);
+    // le rechargement vient d'avoir lieu : sans ça, la révision le relancerait
+    marquerAJour();
   }
 
   Future<({int vus, int total})> _progression(AccueilEntree entree) =>
@@ -108,6 +121,10 @@ class _EcranAccueilState extends State<EcranAccueil>
   /// derrière, et la carte revient si le serveur refuse.
   Future<void> _marquerVu(AccueilEntree entree) async {
     final idEpisode = entree.episode.idEpisode;
+    // seule cette série a bougé : vider tout le cache de progression ferait
+    // repartir un appel /saisons par série, et les barres restaient longtemps
+    // en attente.
+    _progressions.remove(entree.serie.referenceTmdb);
     setState(() => _marques.add(idEpisode));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('${entree.serie.titre} ${entree.episode.code} marqué vu ✓'),
@@ -115,8 +132,10 @@ class _EcranAccueilState extends State<EcranAccueil>
           label: 'Annuler', onPressed: () => _annulerVu(entree)),
     ));
     try {
+      // pas de rechargement explicite : l'écriture fait bouger la révision,
+      // qui déclenche déjà `rafraichir()`. En demander un second ici en
+      // provoquait deux — la série disparaissait, revenait, disparaissait.
       await api.post('/episodes/$idEpisode/vu');
-      await _rafraichir();
     } on ExceptionApi catch (e) {
       if (!mounted) return;
       setState(() => _marques.remove(idEpisode));
@@ -127,8 +146,8 @@ class _EcranAccueilState extends State<EcranAccueil>
   /// Défait le marquage sur simple pression de « Annuler ».
   Future<void> _annulerVu(AccueilEntree entree) async {
     try {
+      _progressions.remove(entree.serie.referenceTmdb);
       await api.delete('/episodes/${entree.episode.idEpisode}/vu');
-      await _rafraichir();
       _message('${entree.episode.code} remis en non vu');
     } on ExceptionApi catch (e) {
       _message(e.message);

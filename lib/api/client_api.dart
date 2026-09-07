@@ -148,22 +148,29 @@ class ClientApi {
   /// cas courant — et le serveur, sur une offre gratuite, se réveille lentement.
   final revision = ValueNotifier<int>(0);
 
-  Future<dynamic> _ecrire(Future<http.Response> Function() requete) async {
+  /// Écritures qui ne changent rien de ce qu'un écran affiche. Les compter
+  /// ferait recharger l'accueil au démarrage, juste après son premier
+  /// chargement : l'enregistrement du jeton de notification part à la
+  /// connexion, et n'a aucun rapport avec le contenu.
+  static const _sansEffetVisible = ['/appareils', '/auth/'];
+
+  Future<dynamic> _ecrire(String chemin,
+      Future<http.Response> Function() requete) async {
     final reponse = await _envoyer(requete);
-    revision.value++;
+    if (!_sansEffetVisible.any(chemin.startsWith)) revision.value++;
     return reponse;
   }
 
   Future<dynamic> post(String chemin, {Object? corps}) =>
-      _ecrire(() => _http.post(_uri(chemin),
+      _ecrire(chemin, () => _http.post(_uri(chemin),
           headers: _entetes, body: corps == null ? null : jsonEncode(corps)));
 
   Future<dynamic> patch(String chemin, {Object? corps}) =>
-      _ecrire(() => _http.patch(_uri(chemin),
+      _ecrire(chemin, () => _http.patch(_uri(chemin),
           headers: _entetes, body: corps == null ? null : jsonEncode(corps)));
 
   Future<dynamic> delete(String chemin) =>
-      _ecrire(() => _http.delete(_uri(chemin), headers: _entetes));
+      _ecrire(chemin, () => _http.delete(_uri(chemin), headers: _entetes));
 
   /// POST /auth/connexion — corps x-www-form-urlencoded imposé par la spec OAuth2.
   Future<String> connexion(String identifiant, String motDePasse) async {
