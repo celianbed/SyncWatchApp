@@ -2,7 +2,8 @@
 // Point d'entrée : restaure la session puis affiche connexion ou l'app.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart'
+    show DeviceOrientation, SystemChrome, rootBundle;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
@@ -15,6 +16,11 @@ import 'theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // L'iPhone autorise le paysage dans l'Info.plist, mais aucun écran n'est
+  // dessiné pour : bandeaux de 230 px, cadre de téléphone de l'onboarding,
+  // grilles d'affiches. Seul le feed d'extraits le débloquera, le temps de
+  // passer une bande-annonce en plein écran.
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   // Les polices sont embarquées dans assets/google_fonts/ : on interdit le
   // téléchargement à l'exécution, pour que la typographie soit juste dès le

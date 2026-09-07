@@ -6,12 +6,14 @@ import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../api/client_api.dart';
 import '../modeles/modeles.dart';
 import '../theme.dart';
+import '../widgets/squelette.dart';
 import '../widgets/affiche_tmdb.dart';
 import 'ecran_fiche_film.dart';
 import 'ecran_fiche_serie.dart';
@@ -51,13 +53,31 @@ class _EcranDecouverteState extends State<EcranDecouverte>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.actif) _charger();
+    if (widget.actif) {
+      _autoriserRotation(true);
+      _charger();
+    }
+  }
+
+  /// L'app est verrouillée en portrait (cf. main.dart) : seul le feed le
+  /// déverrouille, pour qu'une bande-annonce puisse passer en plein écran.
+  /// Le verrou revient dès qu'on quitte l'onglet, sinon la fiche suivante
+  /// s'ouvrirait en paysage sans avoir été dessinée pour.
+  void _autoriserRotation(bool oui) {
+    SystemChrome.setPreferredOrientations(oui
+        ? const [
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]
+        : const [DeviceOrientation.portraitUp]);
   }
 
   @override
   void didUpdateWidget(EcranDecouverte ancien) {
     super.didUpdateWidget(ancien);
     if (ancien.actif == widget.actif) return;
+    _autoriserRotation(widget.actif);
     if (widget.actif) {
       if (_items.isEmpty && !_chargement) {
         _charger(); // chargement paresseux : à la première ouverture de l'onglet
@@ -80,6 +100,8 @@ class _EcranDecouverteState extends State<EcranDecouverte>
 
   @override
   void dispose() {
+    _autoriserRotation(false);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WidgetsBinding.instance.removeObserver(this);
     _sousEtat?.cancel();
     _controleur?.close();
@@ -254,21 +276,43 @@ class _EcranDecouverteState extends State<EcranDecouverte>
     });
   }
 
+  /// Bande-annonce seule, bord à bord, interface système masquée. Un tap
+  /// coupe ou remet le son, comme en portrait — le reste attend le retour
+  /// à la verticale.
+  Widget _pleinEcran() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    return GestureDetector(
+      onTap: _basculerSon,
+      child: ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: _videoIndisponible
+              ? _FondIndisponible(extrait: _items[_index])
+              : YoutubePlayer(controller: _controleur!, aspectRatio: 16 / 9),
+        ),
+      ),
+    );
+  }
+
   void _message(String texte) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_chargement) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (_chargement) return const _SqueletteExtrait();
+
+    // Paysage : la bande-annonce prend tout l'écran, sans les surcouches ni la
+    // barre d'onglets — c'est le geste attendu quand on tourne le téléphone.
+    final paysage =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     if (_erreur != null) {
       return _Erreur(message: _erreur!, surReessayer: _charger);
     }
     if (_items.isEmpty) {
       return const _MessageVide();
     }
+    if (paysage && _controleur != null) return _pleinEcran();
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -544,6 +588,45 @@ class _Erreur extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Ossature du feed pendant le chargement : l'écran est occupé par une seule
+/// vidéo, un disque au milieu du noir ne dit rien de ce qui arrive.
+class _SqueletteExtrait extends StatelessWidget {
+  const _SqueletteExtrait();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: CouleursSW.fond),
+        const Center(
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Squelette(hauteur: double.infinity, rayon: 0),
+          ),
+        ),
+        // les informations du titre, en bas, comme sur une vraie carte
+        Positioned(
+          left: 24,
+          right: 24,
+          bottom: 40,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Squelette.ligne(largeur: 200, hauteur: 20),
+              SizedBox(height: 10),
+              Squelette.ligne(largeur: 120),
+              SizedBox(height: 18),
+              Squelette(largeur: 150, hauteur: 40, rayon: 20),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

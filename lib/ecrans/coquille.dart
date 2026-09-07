@@ -39,7 +39,13 @@ class _CoquilleState extends State<Coquille> {
               onOuvrirRecherche: () => setState(() => _index = 2)),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
+      // En paysage, seul le feed d'extraits est atteignable (les autres écrans
+      // restent verrouillés en portrait) : la barre masquerait le bas de la
+      // bande-annonce sans donner accès à quoi que ce soit d'autre.
+      bottomNavigationBar:
+          MediaQuery.orientationOf(context) == Orientation.landscape
+              ? null
+              : NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
