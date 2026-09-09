@@ -37,16 +37,20 @@ class ApiAvis {
         if (chemin == '/avis/moi') {
           corps = avis == null ? <Object>[] : [avis];
         } else if (chemin == '/avis' && requete.method == 'POST') {
-          final note = jsonDecode(requete.body)['note'];
-          avis = {'id_avis': 7, 'id_serie': 1, 'id_film': null, 'note': note,
-                  'commentaire': null, 'date_publication': '2026-09-01T12:00:00'};
+          final envoye = jsonDecode(requete.body) as Map<String, dynamic>;
+          avis = {'id_avis': 7, 'id_serie': 1, 'id_film': null,
+                  'note': envoye['note'],
+                  'commentaire': envoye['commentaire'],
+                  'date_publication': '2026-09-01T12:00:00'};
           corps = avis;
         } else if (chemin == '/avis/7') {
           if (requete.method == 'DELETE') {
             avis = null;
             return http.Response('', 204);
           }
-          avis!['note'] = jsonDecode(requete.body)['note'];
+          final envoye = jsonDecode(requete.body) as Map<String, dynamic>;
+          avis!['note'] = envoye['note'];
+          avis!['commentaire'] = envoye['commentaire'];
           corps = avis;
         } else {
           return http.Response('{"detail":"inattendu"}', 404);
@@ -157,7 +161,7 @@ void main() {
     testWidgets('sans note, aucun retrait n\'est proposé', (tester) async {
       api = ClientApi(client: ApiAvis().client);
       await ouvrirNote(tester);
-      expect(find.text('Retirer ma note'), findsNothing);
+      expect(find.text('Retirer'), findsNothing);
     });
 
     testWidgets('une note posée par erreur se retire', (tester) async {
@@ -165,7 +169,7 @@ void main() {
       api = ClientApi(client: faux.client);
       await ouvrirNote(tester);
 
-      await tester.tap(find.text('Retirer ma note'));
+      await tester.tap(find.text('Retirer'));
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(faux.appels, contains('DELETE /avis/7'));
@@ -179,9 +183,53 @@ void main() {
       await ouvrirNote(tester);
 
       await tester.tap(find.text('8'));
+      await tester.pump();
+      await tester.tap(find.text('Enregistrer'));
       await tester.pump(); // rien n'est encore revenu du serveur
 
       expect(find.text('8/10'), findsOneWidget);
+    });
+
+    testWidgets('on peut écrire un commentaire', (tester) async {
+      final faux = ApiAvis();
+      api = ClientApi(client: faux.client);
+      await ouvrirNote(tester);
+
+      await tester.enterText(
+          find.byType(TextField), 'La saison 2 est en dessous.');
+      await tester.tap(find.text('7'));
+      await tester.pump();
+      await tester.tap(find.text('Enregistrer'));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(faux.avis!['commentaire'], 'La saison 2 est en dessous.');
+      expect(faux.avis!['note'], 7);
+    });
+
+    testWidgets('un commentaire seul suffit, sans note', (tester) async {
+      // l'API accepte « une note OU un commentaire » : l'app doit pouvoir
+      // envoyer un texte sans obliger à noter
+      final faux = ApiAvis();
+      api = ClientApi(client: faux.client);
+      await ouvrirNote(tester);
+
+      await tester.enterText(find.byType(TextField), 'Sans avis chiffré.');
+      await tester.pump();
+      await tester.tap(find.text('Enregistrer'));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(faux.avis!['note'], isNull);
+      expect(faux.avis!['commentaire'], 'Sans avis chiffré.');
+    });
+
+    testWidgets('un avis vide ne peut pas être enregistré', (tester) async {
+      api = ClientApi(client: ApiAvis().client);
+      await ouvrirNote(tester);
+
+      final bouton = tester.widget<ElevatedButton>(
+          find.widgetWithText(ElevatedButton, 'Enregistrer'));
+      expect(bouton.onPressed, isNull,
+          reason: 'ni note ni texte : l\'API refuserait, autant le dire avant');
     });
   });
 

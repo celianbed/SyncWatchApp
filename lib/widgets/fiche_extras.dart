@@ -52,9 +52,14 @@ class BlocNoterFiche extends StatefulWidget {
   State<BlocNoterFiche> createState() => _BlocNoterFicheState();
 }
 
+/// Même plafond que l'API (schemas/avis.py) : le compteur du champ doit
+/// annoncer la vraie limite, pas en laisser découvrir une au refus.
+const longueurCommentaire = 2000;
+
 class _BlocNoterFicheState extends State<BlocNoterFiche> {
   MonAvis? _avis; // mon avis sur cette cible, s'il existe
   int? _note; // note affichée : posée avant la réponse du serveur
+  String? _commentaire; // idem, pour le texte
 
   @override
   void initState() {
@@ -77,6 +82,7 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
         setState(() {
           _avis = trouve;
           _note = trouve?.note;
+          _commentaire = trouve?.commentaire;
         });
       }
     } on ExceptionApi {
@@ -84,33 +90,46 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
     }
   }
 
-  /// Pose la note tout de suite, l'envoie derrière, et la remet comme elle
-  /// était si le serveur refuse.
-  Future<void> _noter(int note) async {
-    final avant = _note;
-    setState(() => _note = note);
+  /// Pose note et commentaire tout de suite, les envoie derrière, et les
+  /// remet comme ils étaient si le serveur refuse.
+  Future<void> _enregistrer(int? note, String? commentaire) async {
+    final avantNote = _note, avantTexte = _commentaire;
+    setState(() {
+      _note = note;
+      _commentaire = commentaire;
+    });
     try {
       final Map<String, dynamic> brut;
       if (_avis == null) {
         brut = await api.post('/avis', corps: {
-          if (widget.idSerie != null) 'id_serie': widget.idSerie,
-          if (widget.idFilm != null) 'id_film': widget.idFilm,
+          'id_serie': ?widget.idSerie,
+          'id_film': ?widget.idFilm,
           'note': note,
+          'commentaire': commentaire,
         }) as Map<String, dynamic>;
       } else {
+        // null explicite : l'API efface le champ, ce qui permet de retirer
+        // le texte en gardant la note (ou l'inverse)
         brut = await api.patch('/avis/${_avis!.idAvis}',
-            corps: {'note': note}) as Map<String, dynamic>;
+                corps: {'note': note, 'commentaire': commentaire})
+            as Map<String, dynamic>;
       }
       if (mounted) {
         final avis = MonAvis.depuisJson(brut);
         setState(() {
           _avis = avis;
           _note = avis.note;
+          _commentaire = avis.commentaire;
         });
       }
-      _message('Note enregistrée ✓');
+      _message('Avis enregistré ✓');
     } on ExceptionApi catch (e) {
-      if (mounted) setState(() => _note = avant);
+      if (mounted) {
+        setState(() {
+          _note = avantNote;
+          _commentaire = avantTexte;
+        });
+      }
       _message(e.message);
     }
   }
@@ -120,17 +139,20 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
     final avis = _avis;
     if (avis == null) return;
     final avant = _note;
+    final avantTexte = _commentaire;
     setState(() {
       _note = null;
+      _commentaire = null;
       _avis = null;
     });
     try {
       await api.delete('/avis/${avis.idAvis}');
-      _message('Note retirée');
+      _message('Avis retiré');
     } on ExceptionApi catch (e) {
       if (mounted) {
         setState(() {
           _note = avant;
+          _commentaire = avantTexte;
           _avis = avis;
         });
       }
@@ -148,46 +170,19 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
   void _choisirNote() {
     showModalBottomSheet(
       context: context,
-      builder: (contexteFeuille) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Ta note', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (var note = 1; note <= 10; note++)
-                    _PastilleNote(
-                      note: note,
-                      active: _note == note,
-                      surTape: () {
-                        Navigator.of(contexteFeuille).pop();
-                        _noter(note);
-                      },
-                    ),
-                ],
-              ),
-              if (_avis != null) ...[
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () {
-                    Navigator.of(contexteFeuille).pop();
-                    _retirerNote();
-                  },
-                  icon: const Icon(Icons.delete_outline,
-                      size: 18, color: CouleursSW.danger),
-                  label: const Text('Retirer ma note',
-                      style: TextStyle(color: CouleursSW.danger)),
-                ),
-              ],
-            ],
-          ),
-        ),
+      isScrollControlled: true, // laisse la place au clavier
+      builder: (contexteFeuille) => _FeuilleAvis(
+        note: _note,
+        commentaire: _commentaire,
+        peutRetirer: _avis != null,
+        surEnregistrer: (note, texte) {
+          Navigator.of(contexteFeuille).pop();
+          _enregistrer(note, texte);
+        },
+        surRetirer: () {
+          Navigator.of(contexteFeuille).pop();
+          _retirerNote();
+        },
       ),
     );
   }
@@ -198,10 +193,15 @@ class _BlocNoterFicheState extends State<BlocNoterFiche> {
       children: [
         Expanded(
           child: _CarteNote(
-            libelle: 'TA NOTE',
+            libelle: (_commentaire ?? '').trim().isEmpty
+                ? 'TA NOTE'
+                : 'TON AVIS',
             valeur: _note == null ? '?/10' : '$_note/10',
             couleur: CouleursSW.accent,
             icone: Icons.star_rounded,
+            // un commentaire sans note n'affichait que « ?/10 », comme si
+            // rien n'avait été écrit
+            marque: (_commentaire ?? '').trim().isNotEmpty,
             surTape: _choisirNote,
           ),
         ),
@@ -227,11 +227,15 @@ class _CarteNote extends StatelessWidget {
   final IconData? icone;
   final VoidCallback? surTape;
 
+  /// Petite pastille signalant qu'un commentaire accompagne la note.
+  final bool marque;
+
   const _CarteNote(
       {required this.libelle,
       required this.valeur,
       required this.couleur,
       this.icone,
+      this.marque = false,
       this.surTape});
 
   @override
@@ -257,8 +261,17 @@ class _CarteNote extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              Text(libelle,
-                  style: typo.labelSmall?.copyWith(letterSpacing: .8)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (marque) ...[
+                    Icon(Icons.chat_bubble, size: 9, color: couleur),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(libelle,
+                      style: typo.labelSmall?.copyWith(letterSpacing: .8)),
+                ],
+              ),
             ],
           ),
         ),
@@ -414,6 +427,123 @@ class SectionSimilaires extends StatelessWidget {
         const SizedBox(height: 12),
         CarrouselResultats(resultats: resultats, surOuvrir: surOuvrir),
       ],
+    );
+  }
+}
+
+/// Feuille de notation : pastilles et commentaire.
+///
+/// Un widget à part entière, et non un `StatefulBuilder` dans la feuille :
+/// le contrôleur de texte doit vivre aussi longtemps que la feuille, animation
+/// de sortie comprise. Le libérer à la fermeture de la route le détruisait
+/// alors que le champ se reconstruisait encore.
+class _FeuilleAvis extends StatefulWidget {
+  final int? note;
+  final String? commentaire;
+  final bool peutRetirer;
+  final void Function(int? note, String? commentaire) surEnregistrer;
+  final VoidCallback surRetirer;
+
+  const _FeuilleAvis({
+    required this.note,
+    required this.commentaire,
+    required this.peutRetirer,
+    required this.surEnregistrer,
+    required this.surRetirer,
+  });
+
+  @override
+  State<_FeuilleAvis> createState() => _FeuilleAvisState();
+}
+
+class _FeuilleAvisState extends State<_FeuilleAvis> {
+  late final _texte = TextEditingController(text: widget.commentaire ?? '');
+  late int? _choisie = widget.note;
+
+  @override
+  void dispose() {
+    _texte.dispose();
+    super.dispose();
+  }
+
+  bool get _vide => _choisie == null && _texte.text.trim().isEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+            24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Ton avis', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (var note = 1; note <= 10; note++)
+                  _PastilleNote(
+                    note: note,
+                    active: _choisie == note,
+                    // retaper la note active la retire : c'est le seul moyen
+                    // de ne garder qu'un commentaire
+                    surTape: () => setState(
+                        () => _choisie = _choisie == note ? null : note),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _texte,
+              maxLength: longueurCommentaire,
+              maxLines: 4,
+              minLines: 2,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setState(() {}), // active le bouton
+              decoration: const InputDecoration(
+                hintText: 'Ce que tu en as pensé (facultatif)',
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 4),
+            // pas de Spacer ni d'Expanded : la feuille ne borne pas la largeur
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (widget.peutRetirer)
+                  TextButton.icon(
+                    onPressed: widget.surRetirer,
+                    icon: const Icon(Icons.delete_outline,
+                        size: 18, color: CouleursSW.danger),
+                    label: const Text('Retirer',
+                        style: TextStyle(color: CouleursSW.danger)),
+                  ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  // Le thème impose `Size.fromHeight(48)` à tous les
+                  // ElevatedButton, soit une largeur infinie : sans
+                  // contre-ordre, la mise en page échoue dans une Row.
+                  style:
+                      ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
+                  // un avis vide n'existe pas : l'API exige une note ou un
+                  // texte, autant le dire par un bouton inactif
+                  onPressed: _vide
+                      ? null
+                      : () {
+                          final t = _texte.text.trim();
+                          widget.surEnregistrer(
+                              _choisie, t.isEmpty ? null : t);
+                        },
+                  child: const Text('Enregistrer'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
