@@ -35,6 +35,7 @@ final _reponses = <String, Object>{
     'nb_abonnes': 0,
     'nb_abonnements': 0,
     'nb_series': 0,
+    'nb_films': 0,
     'est_abonne': false,
     'me_suit': false,
   },

@@ -32,6 +32,7 @@ class EcranProfilPublic extends StatefulWidget {
 class _EcranProfilPublicState extends State<EcranProfilPublic> {
   late Future<ProfilPublic> _profil = _chargerProfil();
   late final Future<List<ResultatRecherche>> _series = _chargerSeries();
+  late final Future<List<ResultatRecherche>> _films = _chargerFilms();
   late final Future<List<AvisProfil>> _avis = _chargerAvis();
   late final Future<Compatibilite> _compat = _chargerCompat();
   ProfilPublic? _p;
@@ -47,6 +48,11 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
   Future<List<ResultatRecherche>> _chargerSeries() async {
     final d = await api.get('/utilisateurs/${widget.idUtilisateur}/series-suivies') as List;
     return [for (final s in d) ResultatRecherche.depuisJson(s as Map<String, dynamic>)];
+  }
+
+  Future<List<ResultatRecherche>> _chargerFilms() async {
+    final d = await api.get('/utilisateurs/${widget.idUtilisateur}/films-vus') as List;
+    return [for (final f in d) ResultatRecherche.depuisJson(f as Map<String, dynamic>)];
   }
 
   Future<List<AvisProfil>> _chargerAvis() async {
@@ -190,6 +196,8 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
             _Compteur(valeur: p.nbAbonnements, libelle: 'Abonnements',
                 surTape: () => _ouvrirCommunaute(false)),
             _Compteur(valeur: p.nbSeries, libelle: 'Séries'),
+            // la recherche annonçait « N films » et le profil n'en disait rien
+            _Compteur(valeur: p.nbFilms, libelle: 'Films'),
           ],
         ),
         const SizedBox(height: 28),
@@ -197,6 +205,11 @@ class _EcranProfilPublicState extends State<EcranProfilPublic> {
         const SizedBox(height: 12),
         CarrouselResultats(
             resultats: _series, surOuvrir: (r) => ouvrirFiche(context, r)),
+        const SizedBox(height: 28),
+        Text('Films vus', style: typo.titleMedium),
+        const SizedBox(height: 12),
+        CarrouselResultats(
+            resultats: _films, surOuvrir: (r) => ouvrirFiche(context, r)),
         const SizedBox(height: 28),
         Text('Derniers avis', style: typo.titleMedium),
         const SizedBox(height: 12),

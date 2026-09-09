@@ -57,6 +57,9 @@ class ProfilPublic {
   int nbAbonnes;
   final int nbAbonnements;
   final int nbSeries;
+
+  /// Films **vus** — distincts, un revisionnage ne compte pas deux fois.
+  final int nbFilms;
   bool estAbonne;
   final bool meSuit;
 
@@ -68,6 +71,7 @@ class ProfilPublic {
         nbAbonnes = json['nb_abonnes'] as int,
         nbAbonnements = json['nb_abonnements'] as int,
         nbSeries = json['nb_series'] as int,
+        nbFilms = json['nb_films'] as int? ?? 0,
         estAbonne = json['est_abonne'] as bool,
         meSuit = json['me_suit'] as bool;
 
